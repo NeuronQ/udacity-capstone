@@ -1,5 +1,6 @@
 # write code that works in both Python 2 (2.7+) and 3 (3.5+)
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import (
+    absolute_import, division, print_function, unicode_literals)
 try:
     input = raw_input
 except NameError:
@@ -11,6 +12,7 @@ import datetime as dtm
 from contextlib import contextmanager
 import numpy as np
 import tensorflow as tf
+from functools import wraps
 
 
 @contextmanager

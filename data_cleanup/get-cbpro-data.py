@@ -17,6 +17,8 @@ from functools import wraps
 
 import cbpro
 
+from util import
+
 
 OUT_FILE = '../data_src/btc.300s.cbpro.csv'
 END_AT = dt.datetime(year=2018, month=10, day=10, hour=0)
@@ -31,12 +33,12 @@ TEST_RUN = False
 # RATE LIMITS: 3 req/sec public, 5 req/sec authenticated
 #   NOTE: seems to be more like 2 and 4...
 
-# pc = cbpro.PublicClient()
-pc = cbpro.AuthenticatedClient(
-    '7841a59e7928b8e627add6375d467a8c',
-    'HcBR3ASHPIKOE/eMgEW8tV+1qnsAJOhz8fGlotYtQ6kKytkXfAqzBKffsowwclK9miWVEfEuNy7iYsP2dS78Hg==',  # noqa
-    '2@Coinbase'
-)
+pc = cbpro.PublicClient()
+# pc = cbpro.AuthenticatedClient(
+#     os.environ.get('CBPRO_API_KEY'),  # key
+#     os.environ.get('CBPRO_API_SECRET_B64'),  # b64secret
+#     os.environ.get('CBPRO_API_PASSPHRASE'),  # passphrase
+# )
 
 if TEST_RUN:
     print('\n====== test run ======')
@@ -59,56 +61,6 @@ if TEST_RUN:
     print('====== / test run ======\n')
 
 
-class rate_limit(object):
-    def __init__(self, n, dt, spacing_dt=None):
-        self.n = n
-        self.dt = dt
-        self.remaining = n
-        self.spacing_dt = spacing_dt
-        self.t0 = time.time()
-
-    def __call__(self, func):
-        @wraps(func)
-        def wrapped_func(*args, **kwargs):
-            if time.time() - self.t0 > self.dt:
-                self.t0 = time.time()
-                self.remaining = self.n
-            r = func(*args, **kwargs)
-            if self.spacing_dt:
-                time.sleep(self.spacing_dt)
-            self.remaining -= 1
-            if self.remaining == 0:
-                # wait if no runs left for current interval
-                t_elapsed = time.time() - self.t0
-                t_left = self.dt - t_elapsed
-                if t_left > 0:
-                    time.sleep(t_left)
-                # reset
-                self.t0 = time.time()
-                self.remaining = self.n
-            return r
-        return wrapped_func
-
-
-def retry(tries, delay=None):
-    def decorator(func):
-        @wraps(func)
-        def wrapped_func(*args, **kwargs):
-            remaining = tries
-            while remaining:
-                if remaining != tries:
-                    print("[retry]")
-                r, err = func(*args, **kwargs)
-                remaining -= 1
-                if not err:
-                    break
-                if delay:
-                    time.sleep(delay)
-            return r, err
-        return wrapped_func
-    return decorator
-
-
 max_req_interval = GRANULARITY_SECONDS * MAX_DATA_POINTS
 n_requests = int((END_AT - START_AT).total_seconds() / max_req_interval)
 
@@ -127,9 +79,13 @@ def save_data(data):
     csv_writer.writerows(data)
     out_file.flush()
 
+# with private ai key try these for faster resultst:
+# @retry(tries=4, delay=1)
+# @rate_limit(n=4, dt=1)
+
 
 @retry(tries=4, delay=1)
-@rate_limit(n=4, dt=1)
+@rate_limit(n=2, dt=1)
 def fetch_data(from_dt, to_dt):
     print(time.time())
     print("Fetching data from {} to {}".format(
