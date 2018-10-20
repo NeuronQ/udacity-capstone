@@ -742,3 +742,239 @@ def run_walk_forward_validation_arima(
             color='m',
             alpha=0.4
         )
+
+
+``
+
+
+def run_walk_forward_validation_rnn_retraining(
+    # data to extract:
+    data_df,
+    features,
+    from_i,
+    train_sz,
+    test_sz,
+    # data processing:
+    normalize,  # 'seqs' | 'data'
+    detrend,
+    # model and prediction arrangement:
+    seq_len,
+    pred_len,
+    model_maker,
+    # training:
+    epochs,
+    batch_size,
+    shuffle,
+    # experiment setup:
+    times,
+    skip,
+    fix_all_rngs_to,
+    fix_rngs_before_each,
+    # plotting:
+    plotting=True,
+    model_desc='',
+    fig_size=(10, 8),
+    fast=False
+):
+    assert normalize in {'seqs', 'data'}
+    assert times in {1, 4}, "plotting support for other values not implemented"
+
+    if fix_all_rngs_to is not False:
+        helpers.fix_all_rngs(fix_all_rngs_to)
+
+    # extract data
+    data = etl.extract_data_matrix_from_df(
+        data_df,
+        features,
+        from_i,
+        from_i + train_sz + test_sz
+    )
+    data.setflags(write=False)
+    test_data = data[train_sz:]
+    test_data.setflags(write=False)
+    assert data.shape == (train_sz + test_sz, len(features))
+
+    # normalize data
+    scaler = None
+    if normalize == 'data':
+        data, scaler = etl.scaled_data(data)
+    # detrend
+    if detrend:
+        data = etl.detrended_data(data)
+
+    ###
+    # plt.plot(data)
+    # plt.show()
+    print("data ~ %s" % (data.shape,))
+
+    # make sequences
+    seqs = etl.make_sliding_seqs(data, seq_len)
+
+    # normalize seqs
+    if normalize == 'seqs':
+        seqs = etl.normalized_seqs_cols(seqs)
+
+    # plotting setup
+    if plot:
+        plt.figure(figsize=fig_size, facecolor='white')
+        desc = (
+            'train on {from_idx}:{to_idx} bc@5m data shuffle={shuffle}, '
+            'test on next {test_sz}, normalize={normalize}'
+        ).format(
+            from_idx=from_i,
+            to_idx=from_i + train_sz,
+            shuffle=int(shuffle),
+            test_sz=test_sz,
+            normalize=normalize,
+        )
+        plt.suptitle(
+            (model_desc or getattr(model_maker, 'desc', '')) +
+            ' {} batch_size={} epochs={} seq_len={} pred_len={}'.format(
+                ','.join(features),
+                batch_size,
+                epochs,
+                seq_len,
+                pred_len
+            ) +
+            (('\n' + desc) if desc else '') +
+            '\n\n\n'
+        )
+        if times > 1:
+            plt.subplots_adjust(top=0.8, hspace=0.5)
+        # show a nice grid if multilple
+        rows = cols = np.ceil(np.sqrt(times))
+
+    # possibly multiple runs
+    for i in range(time):
+
+        if fix_rngs_before_each:
+            helpers.fix_all_rngs(fix_all_rngs_to)
+
+        model = model_maker(seq_len, len(features))
+
+        pred_seqs = []
+        losses = []
+
+        step = 1 if skip is False else pred_len
+        for idx in range(0, seqs.shape[0] - train_sz - pred_len, step):
+
+            x_train_seqs, y_train, x_test_seqs, y_test =\
+                etl.make_train_test_seqs(
+                    seqs[i: i + train_sz + 1],
+                    train_sz,
+                    shuffle
+                )
+            x_train_seqs.setflags(write=False)
+            y_train.setflags(write=False)
+            x_test_seqs.setflags(write=False)
+            y_test.setflags(write=False)
+
+            with helpers.timing('train model'):
+                training_history = model.fit(
+                    x_train_seqs,
+                    y_train,
+                    batch_size=batch_size,
+                    epochs=epochs,
+                    validation_split=0.05,
+                    shuffle=False,
+                )
+
+            final_training_loss = -1
+            if training_history:
+                final_training_loss = training_history.history['loss'][-1]
+
+            ys = np.zeros(pred_len, dtype=np.float32)
+            xs = x_test_seqs[0].copy()
+            for pidx in range(pred_len):
+                ys[pidx] = model.predict(xs[None, :, :])[0, 0]
+                xs[0, 0: -1, :] = xs[0, 1:, :]
+                xs[0: -1, :] = xs[1:, :]
+                xs[-1, 0] = ys[j]
+
+            pred_seqs.append(ys)
+
+            loss = compute_dacc_loss_vs_ct_y(
+                ys[-1],
+                y_test[0],
+                xs[-1, 0]
+            )
+            if loss is not None:
+                losses.append(loss)
+            else:
+                print("WARNING: can't compute loss for prediction at index %d" % (
+                    i * seq_len + pred_len,
+                ))
+
+        # denormalize predictions
+        if normalize == 'data':
+            for preds in pred_seqs:
+                # hack because the scaler expects a number of columns equal to
+                # no. of features, but we only predict feature 0
+                if len(features) == 1:
+                    scaler_input = preds.reshape((-1, 1))
+                else:
+                    scaler_input = preds.reshape((-1, 1)).repeat(
+                        len(features), axis=1
+                    )
+                preds[:] = scaler.inverse_transform(scaler_input)[:, 0]
+        elif normalize == 'seqs':
+            for preds_i, preds in enumerate(pred_seqs):
+                preds += 1
+                preds *= test_data[preds_i if not skip else preds_i * seq_len, 0]
+
+        # readd trend
+        if detrend:
+            if not skip:
+                raise NotImplementedError(
+                    'Using read_trend with no_skip=True is not implemented')
+            for preds_i, preds in enumerate(pred_seqs):
+                preds[0] += test_data[
+                    (preds_i + 1) * seq_len - 1,
+                    0
+                ]
+                for pidx in range(1, len(preds)):
+                    preds[pidx] += preds[pidx - 1]
+
+        # no more changes to predictions from this onwards
+        pred_seqs = np.array(pred_seqs)
+        pred_seqs.setflags(write=False)
+
+        # process losses data for printing in (sub)plot title
+        losses = np.array(losses, dtype=np.float32)
+        if not skip:
+            dir_acc = losses[0] * 100
+            rmse = losses[2]
+            rmse_cp = losses[3]
+        else:
+            if not fast:
+                dir_acc = np.average(losses[:, 0]) * 100
+                rmse = np.sqrt(np.average(losses[:, 2]))
+                rmse_cp = np.sqrt(np.average(losses[:, 3]))
+            else:
+                dir_acc, _, rmse, rmse_cp = losses
+
+        if plot:
+            # next subplot if multiple
+            if times > 1:
+                plt.subplot(rows, cols, i + 1)
+            # plot title
+            plt.title(
+                'Dir. Acc.: {:.4f}%'.format(dir_acc) +
+                ('\n' if times > 1 else ', ') +
+                'RMSE: {:.4f} vs. {:.4f} for CP'.format(
+                    rmse,
+                    rmse_cp,
+                ) +
+                ('\n' if times > 1 else ' ') +
+                '(Loss: {:.4e})'.format(final_training_loss)
+            )
+            # plot predictions test data with predictions
+            with helpers.timing('plot incremental predictions'):
+                if not skip:
+                    plot_pred_seqs_all(
+                        test_data[:, 0], seq_len, pred_seqs)
+                else:
+                    plot_pred_seqs(
+                        test_data[:, 0], seq_len, pred_seqs)
+
+            plt.show()
