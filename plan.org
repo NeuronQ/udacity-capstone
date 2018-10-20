@@ -4,10 +4,19 @@
 ** DONE 1.2 BC @24h
 
 * TODO 2. Full final runs
+
 ** TODO 2.1 BC @5min
+--- 0.015s to model compilation time
+--- 42.399s to train model
+--- 694.530s to walk and predict
+--- 12.219s to plot incremental predictions
+--- 0.016s to model compilation time
+
 *** TODO 2.1.1 using `close`
+
 *** TODO 2.1.2 using OHLC
 *** TODO 2.1.3 using OHLC + day of week
+
 ** TODO 2.2 BC @24h
 *** TODO 2.2.1 using `close`
 *** TODO 2.2.2 using OHLC
@@ -15,6 +24,7 @@
 *** TODO 2.2.4 using OHLC + day of week + SP500 derived feature
 *** TODO 2.2.5 using OHLC + day of week + news sentiment last 7 days
 *** TODO 2.2.6 using OHLC + day of week + SP500 derived feature + news sentiment last 7 days
+
 ** TODO 2.3 stock @24h
 *** TODO 2.3.1 using `close`
 *** TODO 2.3.2 using OHLC + day of week
