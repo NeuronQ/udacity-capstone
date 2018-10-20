@@ -39,6 +39,7 @@ def run_walk_forward_validation_rnn(
     fix_all_rngs_to,
     fix_rngs_before_each,
     # plotting:
+    plot=True,
     model_desc='',
     fig_size=(10, 8),
     fast=False
@@ -99,35 +100,47 @@ def run_walk_forward_validation_rnn(
     # plt.show()
     # plt.plot(data[seq_len: seq_len * 2])
     # plt.show()
-
-    # plotting setup
-    plt.figure(figsize=fig_size, facecolor='white')
-    desc = (
-        'train on {from_idx}:{to_idx} bc@5m data shuffle={shuffle}, '
-        'test on next {test_sz}, normalize={normalize}'
-    ).format(
-        from_idx=from_i,
-        to_idx=from_i + train_sz,
-        shuffle=int(shuffle),
-        test_sz=test_sz,
-        normalize=normalize,
-    )
-    plt.suptitle(
-        (model_desc or getattr(model_maker, 'desc', '')) +
+    
+    model_description = (model_desc or getattr(model_maker, 'desc', '')) + \
         ' {} batch_size={} epochs={} seq_len={} pred_len={}'.format(
             ','.join(features),
             batch_size,
             epochs,
             seq_len,
             pred_len
-        ) +
-        (('\n' + desc) if desc else '') +
-        '\n\n\n'
+        )
+
+    # plotting setup
+    if plot:
+        plt.figure(figsize=fig_size, facecolor='white')
+        desc = (
+            'train on {from_idx}:{to_idx} bc@5m data shuffle={shuffle}, '
+            'test on next {test_sz}, normalize={normalize}'
+        ).format(
+            from_idx=from_i,
+            to_idx=from_i + train_sz,
+            shuffle=int(shuffle),
+            test_sz=test_sz,
+            normalize=normalize,
+        )
+        plt.suptitle(
+            model_description +
+            (('\n' + desc) if desc else '') +
+            '\n\n\n'
+        )
+        if times > 1:
+            plt.subplots_adjust(top=0.8, hspace=0.5)
+        # show a nice grid if multilple
+        rows = cols = np.ceil(np.sqrt(times))
+
+    out = dict(
+        model_description=model_description,
+        train_from=from_i,
+        train_to=from_i + train_sz,
+        test_on=test_sz,
+        shuffle=shuffle,
+        normalize=normalize,
     )
-    if times > 1:
-        plt.subplots_adjust(top=0.8, hspace=0.5)
-    # show a nice grid if multilple
-    rows = cols = np.ceil(np.sqrt(times))
 
     # possibly multiple runs
     for i in range(times):
@@ -169,10 +182,11 @@ def run_walk_forward_validation_rnn(
                     compute_dacc_loss_vs_ct_y
                 )
 
-        print('### pred_seqs: len={}, shape={}'.format(
-            len(pred_seqs),
-            pred_seqs[0].shape if len(pred_seqs) else -1
-        ))
+        ###
+        # print('### pred_seqs: len={}, shape={}'.format(
+        #     len(pred_seqs),
+        #     pred_seqs[0].shape if len(pred_seqs) else -1
+        # ))
 
         ###
         # plt.plot(pred_seqs[0])
@@ -229,32 +243,44 @@ def run_walk_forward_validation_rnn(
                 rmse_cp = np.sqrt(np.average(losses[:, 3]))
             else:
                 dir_acc, _, rmse, rmse_cp = losses
-
-        # next subplot if multiple
-        if times > 1:
-            plt.subplot(rows, cols, i + 1)
-        # plot title
-        plt.title(
-            'Dir. Acc.: {:.4f}%'.format(dir_acc) +
-            ('\n' if times > 1 else ', ') +
-            'RMSE: {:.4f} vs. {:.4f} for CP'.format(
-                rmse,
-                rmse_cp,
-            ) +
-            ('\n' if times > 1 else ' ') +
-            '(Loss: {:.4e})'.format(final_training_loss)
+    
+        # return results/stats
+        out.update(
+            training_loss='{:.4e})'.format(final_training_loss),
+            rmse='{:.4f}%'.format(rmse),
+            rmse_cp='{:.4f}%'.format(rmse_cp),
+            dir_acc='{:.4f}%'.format(dir_acc),
         )
 
-        # plot predictions test data with predictions
-        with helpers.timing('plot incremental predictions'):
-            if not skip:
-                plot_pred_seqs_all(
-                    test_data[:, 0], seq_len, pred_seqs)
-            else:
-                plot_pred_seqs(
-                    test_data[:, 0], seq_len, pred_seqs)
+        # next subplot if multiple
+        if plot:
+            if times > 1:
+                plt.subplot(rows, cols, i + 1)
+            # plot title
+            plt.title(
+                'Dir. Acc.: {:.4f}%'.format(dir_acc) +
+                ('\n' if times > 1 else ', ') +
+                'RMSE: {:.4f} vs. {:.4f} for CP'.format(
+                    rmse,
+                    rmse_cp,
+                ) +
+                ('\n' if times > 1 else ' ') +
+                '(Loss: {:.4e})'.format(final_training_loss)
+            )
 
-    plt.show()
+            # plot predictions test data with predictions
+            with helpers.timing('plot incremental predictions'):
+                if not skip:
+                    plot_pred_seqs_all(
+                        test_data[:, 0], seq_len, pred_seqs)
+                else:
+                    plot_pred_seqs(
+                        test_data[:, 0], seq_len, pred_seqs)
+
+    if plot:
+        plt.show()
+    
+    return out
 
 
 def walk_and_predict(
