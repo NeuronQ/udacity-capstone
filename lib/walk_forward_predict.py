@@ -100,7 +100,7 @@ def run_walk_forward_validation_rnn(
     # plt.show()
     # plt.plot(data[seq_len: seq_len * 2])
     # plt.show()
-    
+
     model_description = (model_desc or getattr(model_maker, 'desc', '')) + \
         ' {} batch_size={} epochs={} seq_len={} pred_len={}'.format(
             ','.join(features),
@@ -108,7 +108,7 @@ def run_walk_forward_validation_rnn(
             epochs,
             seq_len,
             pred_len
-        )
+    )
 
     # plotting setup
     if plot:
@@ -243,7 +243,7 @@ def run_walk_forward_validation_rnn(
                 rmse_cp = np.sqrt(np.average(losses[:, 3]))
             else:
                 dir_acc, _, rmse, rmse_cp = losses
-    
+
         # return results/stats
         out.update(
             training_loss='{:.4e})'.format(final_training_loss),
@@ -279,7 +279,7 @@ def run_walk_forward_validation_rnn(
 
     if plot:
         plt.show()
-    
+
     return out
 
 
@@ -744,9 +744,6 @@ def run_walk_forward_validation_arima(
         )
 
 
-``
-
-
 def run_walk_forward_validation_rnn_retraining(
     # data to extract:
     data_df,
@@ -771,7 +768,7 @@ def run_walk_forward_validation_rnn_retraining(
     fix_all_rngs_to,
     fix_rngs_before_each,
     # plotting:
-    plotting=True,
+    plot=True,
     model_desc='',
     fig_size=(10, 8),
     fast=False
@@ -814,6 +811,15 @@ def run_walk_forward_validation_rnn_retraining(
     if normalize == 'seqs':
         seqs = etl.normalized_seqs_cols(seqs)
 
+    model_description = (model_desc or getattr(model_maker, 'desc', '')) + \
+        ' {} batch_size={} epochs={} seq_len={} pred_len={}'.format(
+            ','.join(features),
+            batch_size,
+            epochs,
+            seq_len,
+            pred_len
+    )
+
     # plotting setup
     if plot:
         plt.figure(figsize=fig_size, facecolor='white')
@@ -828,14 +834,7 @@ def run_walk_forward_validation_rnn_retraining(
             normalize=normalize,
         )
         plt.suptitle(
-            (model_desc or getattr(model_maker, 'desc', '')) +
-            ' {} batch_size={} epochs={} seq_len={} pred_len={}'.format(
-                ','.join(features),
-                batch_size,
-                epochs,
-                seq_len,
-                pred_len
-            ) +
+            model_description +
             (('\n' + desc) if desc else '') +
             '\n\n\n'
         )
@@ -844,23 +843,31 @@ def run_walk_forward_validation_rnn_retraining(
         # show a nice grid if multilple
         rows = cols = np.ceil(np.sqrt(times))
 
+    out = dict(
+        model_description=model_description,
+        train_from=from_i,
+        train_to=from_i + train_sz,
+        test_on=test_sz,
+        shuffle=shuffle,
+        normalize=normalize,
+    )
+
     # possibly multiple runs
-    for i in range(time):
+    for i in range(times):
 
         if fix_rngs_before_each:
             helpers.fix_all_rngs(fix_all_rngs_to)
 
-        model = model_maker(seq_len, len(features))
-
         pred_seqs = []
-        losses = []
+        losses = np.zeros(4, dtype=np.float32)  # aggregate compute_loss results
+        losses_count = 0
 
         step = 1 if skip is False else pred_len
         for idx in range(0, seqs.shape[0] - train_sz - pred_len, step):
 
             x_train_seqs, y_train, x_test_seqs, y_test =\
                 etl.make_train_test_seqs(
-                    seqs[i: i + train_sz + 1],
+                    seqs[idx: idx + train_sz + 1],
                     train_sz,
                     shuffle
                 )
@@ -869,15 +876,33 @@ def run_walk_forward_validation_rnn_retraining(
             x_test_seqs.setflags(write=False)
             y_test.setflags(write=False)
 
-            with helpers.timing('train model'):
-                training_history = model.fit(
-                    x_train_seqs,
-                    y_train,
-                    batch_size=batch_size,
-                    epochs=epochs,
-                    validation_split=0.05,
-                    shuffle=False,
-                )
+            print("""\n====== {}
+                x_train_seqs ~ {} [...{}]
+                y_train ~ {} [...{}]
+                x_test_seqs ~ {} [...{}]
+                y_test ~ {} [...{}]
+                """.format(
+                idx,
+                x_train_seqs.shape,
+                x_train_seqs[-1, -1, 0],
+                y_train.shape,
+                y_train[-1],
+                x_test_seqs.shape,
+                x_test_seqs[-1, -1, 0],
+                y_test.shape,
+                y_test[-1]
+            ))
+
+            model = model_maker(seq_len, len(features))
+
+            training_history = model.fit(
+                x_train_seqs,
+                y_train,
+                batch_size=batch_size,
+                epochs=epochs,
+                validation_split=0.05,
+                shuffle=False,
+            )
 
             final_training_loss = -1
             if training_history:
@@ -886,26 +911,38 @@ def run_walk_forward_validation_rnn_retraining(
             ys = np.zeros(pred_len, dtype=np.float32)
             xs = x_test_seqs[0].copy()
             for pidx in range(pred_len):
-                ys[pidx] = model.predict(xs[None, :, :])[0, 0]
-                xs[0, 0: -1, :] = xs[0, 1:, :]
+                r = model.predict(xs[None, :, :])[0, 0]
+                ys[pidx] = r
                 xs[0: -1, :] = xs[1:, :]
-                xs[-1, 0] = ys[j]
+                xs[0: -1, :] = xs[1:, :]
+                xs[-1, 0] = ys[pidx]
 
             pred_seqs.append(ys)
 
+            print("\n ~~~~ pred_y={}, target_y={}, start_y={}".format(
+                ys[-1],
+                y_test[0, 0],
+                x_test_seqs[0][-1, 0]
+            ))
             loss = compute_dacc_loss_vs_ct_y(
                 ys[-1],
-                y_test[0],
-                xs[-1, 0]
+                y_test[0, 0],
+                x_test_seqs[0][-1, 0]
             )
             if loss is not None:
-                losses.append(loss)
+                losses += loss
+                losses_count += 1
             else:
                 print("WARNING: can't compute loss for prediction at index %d" % (
                     i * seq_len + pred_len,
                 ))
 
-        # denormalize predictions
+        losses[0] /= losses_count
+        losses[1] /= losses_count
+        losses[2] = np.sqrt(losses[2] / losses_count)
+        losses[3] = np.sqrt(losses[3] / losses_count)
+
+        # denormalize predictionscompute_dacc_loss_vs_ct_y
         if normalize == 'data':
             for preds in pred_seqs:
                 # hack because the scaler expects a number of columns equal to
@@ -940,18 +977,28 @@ def run_walk_forward_validation_rnn_retraining(
         pred_seqs.setflags(write=False)
 
         # process losses data for printing in (sub)plot title
-        losses = np.array(losses, dtype=np.float32)
-        if not skip:
-            dir_acc = losses[0] * 100
-            rmse = losses[2]
-            rmse_cp = losses[3]
-        else:
-            if not fast:
-                dir_acc = np.average(losses[:, 0]) * 100
-                rmse = np.sqrt(np.average(losses[:, 2]))
-                rmse_cp = np.sqrt(np.average(losses[:, 3]))
-            else:
-                dir_acc, _, rmse, rmse_cp = losses
+        dir_acc, _, rmse, rmse_cp = losses
+        dir_acc *= 100
+        # losses = np.array(losses, dtype=np.float32)
+        # if not skip:
+        #     dir_acc = losses[0] * 100
+        #     rmse = losses[2]
+        #     rmse_cp = losses[3]
+        # else:
+        #     if not fast:
+        #         dir_acc = np.average(losses[:, 0]) * 100
+        #         rmse = np.sqrt(np.average(losses[:, 2]))
+        #         rmse_cp = np.sqrt(np.average(losses[:, 3]))
+        #     else:
+        #         dir_acc, _, rmse, rmse_cp = losses
+
+        # return results/stats
+        out.update(
+            training_loss='{:.4e})'.format(final_training_loss),
+            rmse='{:.4f}%'.format(rmse),
+            rmse_cp='{:.4f}%'.format(rmse_cp),
+            dir_acc='{:.4f}%'.format(dir_acc),
+        )
 
         if plot:
             # next subplot if multiple

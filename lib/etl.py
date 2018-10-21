@@ -66,8 +66,8 @@ def detrended_data(data):
 
 
 def make_train_test_seqs(seqs, train_sz, shuffle):
-    print("train_sz = %s" % (train_sz,))
-    print("\nseqs ~ %s" % (seqs.shape,))
+    # print("train_sz = %s" % (train_sz,))
+    # print("\nseqs ~ %s" % (seqs.shape,))
 
     seq_len = seqs.shape[1]  # this is length of training seq + 1
     # IMPORTANT: -seq_len is to prevent train-test cross-contamination
