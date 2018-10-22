@@ -120,3 +120,4 @@ model_description,train_from,train_to,test_on,shuffle,normalize,training_loss,rm
 "RNN(100|0.1|50|0.1|linear, RMSprop, mse) close batch_size=512 epochs=3 seq_len=100 pred_len=100",351000,376000,3000,False,seqs,5.1821e-05),0.0202%,0.0251%,64.1016%
 "RNN(100|0.1|50|0.1|linear, RMSprop, mse) close batch_size=512 epochs=3 seq_len=100 pred_len=100",354000,379000,3000,False,seqs,5.7188e-05),0.0159%,0.0166%,63.5938%
 "RNN(100|0.1|50|0.1|linear, RMSprop, mse) close batch_size=512 epochs=3 seq_len=100 pred_len=100",357000,382000,3000,False,seqs,6.0764e-05),0.0127%,0.0164%,68.2813%
+model_description,train_from,train_to,test_on,shuffle,normalize,training_loss,rmse,rmse_cp,dir_acc

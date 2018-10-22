@@ -13,7 +13,6 @@
 --- 0.016s to model compilation time
 
 *** TODO 2.1.1 using `close`
-
 *** TODO 2.1.2 using OHLC
 *** TODO 2.1.3 using OHLC + day of week
 
