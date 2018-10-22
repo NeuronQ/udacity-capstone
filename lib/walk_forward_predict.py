@@ -1024,4 +1024,7 @@ def run_walk_forward_validation_rnn_retraining(
                     plot_pred_seqs(
                         test_data[:, 0], seq_len, pred_seqs)
 
-            plt.show()
+    if plot:
+        plt.show()
+
+    return out
