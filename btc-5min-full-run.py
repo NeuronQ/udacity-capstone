@@ -59,7 +59,7 @@ dd(data5m.tail())
 DEFAULT_PARAMS = {
     # data to extract:
     'data_df': data5m,
-    'features': ['close'],
+    'features': ['close', 'open', 'high', 'low', 'volume'],
     'train_sz': 25000,
     'test_sz': 3000,
     # data processing:
@@ -79,7 +79,7 @@ DEFAULT_PARAMS = {
     'fix_all_rngs_to': False,
     'fix_rngs_before_each': False,
     # plotting:
-    'plot': True,
+    'plot': False,
     'fig_size': (10, 8),
     'fast': True,
 }
@@ -119,10 +119,10 @@ def full_run(idx_from, idx_to, write_csv_header=False):
                           from_i=i - train_sz)
             ddump("\n   ------ RUN %d (from %s, train on %d, test on %d)\n" % (
                 i, params['from_i'], params['train_sz'], params['test_sz']))
-            # with timing('run segment'):
-            #     out = run_walk_forward_validation_rnn(**params)
-            #     csv_writer.writerow(out)
-            #     out_file.flush()
+            with timing('run segment'):
+                out = run_walk_forward_validation_rnn(**params)
+                csv_writer.writerow(out)
+                out_file.flush()
 
 
-full_run(DEFAULT_PARAMS['train_sz'], len(data5m), False)
+full_run(DEFAULT_PARAMS['train_sz'], len(data5m), True)
