@@ -233,9 +233,13 @@ def run_walk_forward_validation_rnn(
         # process losses data for printing in (sub)plot title
         losses = np.array(losses, dtype=np.float32)
         if not skip:
-            dir_acc = losses[0] * 100
-            rmse = losses[1]
-            rmse_cp = losses[2]
+            dir_accs = losses[0] * 100
+            rmses = losses[1]
+            rmses_cp = losses[2]
+            # get last ones
+            dir_acc = dir_accs[-1]
+            rmse = rmses[-1]
+            rmse_cp = rmses_cp[-1]
         else:
             if not fast:
                 dir_acc = np.average(losses[:, 0]) * 100
@@ -247,22 +251,21 @@ def run_walk_forward_validation_rnn(
         # return results/stats
         out.update(
             training_loss='{:.4e})'.format(final_training_loss),
-            rmse='{:.4f}%'.format(rmse[-1]),
-            rmse_cp='{:.4f}%'.format(rmse_cp[-1]),
-            dir_acc='{:.4f}%'.format(dir_acc[-1]),
+            rmse='{:.4f}%'.format(rmse),
+            rmse_cp='{:.4f}%'.format(rmse_cp),
+            dir_acc='{:.4f}%'.format(dir_acc),
         )
 
-        # next subplot if multiple
         if plot:
             if times > 1:
                 plt.subplot(rows, cols, i + 1)
             # plot title
             plt.title(
-                'Dir. Acc.: {:.4f}%'.format(dir_acc[-1]) +
+                'Dir. Acc.: {:.4f}%'.format(dir_acc) +
                 ('\n' if times > 1 else ', ') +
                 'RMSE: {:.4f} vs. {:.4f} for CP'.format(
-                    rmse[-1],
-                    rmse_cp[-1],
+                    rmse,
+                    rmse_cp,
                 ) +
                 ('\n' if times > 1 else ' ') +
                 '(Loss: {:.4e})'.format(final_training_loss)
@@ -281,7 +284,7 @@ def run_walk_forward_validation_rnn(
         if not skip:
             plt.figure()
             plt.title('DACC(#ahead)')
-            plt.plot(np.arange(1, len(dir_acc) + 1), dir_acc)
+            plt.plot(np.arange(1, len(dir_accs) + 1), dir_accs)
         plt.show()
 
     return out
@@ -395,8 +398,19 @@ def fast_walk_and_predict(
         extrapf_xs = _extrapolate_multi_features(lr, xs[:, :, 1:], pred_len)
 
     for j in range(pred_len):
+        if len(xs) == 0:
+            print("!!! empty prediction input passed")
+            continue
         r = model.predict(xs)
-        assert r.shape == (batch_sz, 1), (r.shape, batch_sz)
+        try:
+            assert r.shape == (batch_sz, 1), (r.shape, batch_sz)
+        except:
+            print(
+                r,
+                batch_sz
+            )
+            import pdb
+            pdb.set_trace()
         ys[:, j] = r[:, 0]
         xs[:, 0: -1, :] = xs[:, 1:, :]
         xs[:, -1, 0] = ys[:, j]
