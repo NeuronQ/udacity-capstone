@@ -234,8 +234,8 @@ def run_walk_forward_validation_rnn(
         losses = np.array(losses, dtype=np.float32)
         if not skip:
             dir_acc = losses[0] * 100
-            rmse = losses[2]
-            rmse_cp = losses[3]
+            rmse = losses[1]
+            rmse_cp = losses[2]
         else:
             if not fast:
                 dir_acc = np.average(losses[:, 0]) * 100
@@ -247,9 +247,9 @@ def run_walk_forward_validation_rnn(
         # return results/stats
         out.update(
             training_loss='{:.4e})'.format(final_training_loss),
-            rmse='{:.4f}%'.format(rmse),
-            rmse_cp='{:.4f}%'.format(rmse_cp),
-            dir_acc='{:.4f}%'.format(dir_acc),
+            rmse='{:.4f}%'.format(rmse[-1]),
+            rmse_cp='{:.4f}%'.format(rmse_cp[-1]),
+            dir_acc='{:.4f}%'.format(dir_acc[-1]),
         )
 
         # next subplot if multiple
@@ -258,11 +258,11 @@ def run_walk_forward_validation_rnn(
                 plt.subplot(rows, cols, i + 1)
             # plot title
             plt.title(
-                'Dir. Acc.: {:.4f}%'.format(dir_acc) +
+                'Dir. Acc.: {:.4f}%'.format(dir_acc[-1]) +
                 ('\n' if times > 1 else ', ') +
                 'RMSE: {:.4f} vs. {:.4f} for CP'.format(
-                    rmse,
-                    rmse_cp,
+                    rmse[-1],
+                    rmse_cp[-1],
                 ) +
                 ('\n' if times > 1 else ' ') +
                 '(Loss: {:.4e})'.format(final_training_loss)
@@ -278,6 +278,10 @@ def run_walk_forward_validation_rnn(
                         test_data[:, 0], seq_len, pred_seqs)
 
     if plot:
+        if not skip:
+            plt.figure()
+            plt.title('DACC(#ahead)')
+            plt.plot(np.arange(1, len(dir_acc) + 1), dir_acc)
         plt.show()
 
     return out
@@ -475,24 +479,37 @@ def walk_and_predict_all_batch(
     assert len(seqs.shape) == 3
     seq_len = seqs.shape[1]
 
-    pred_seqs = []
-    losses = np.zeros(4, dtype=np.float32)  # aggregate compute_loss results
+    assert seq_len >= pred_len  # this simplifies some things
+
+    # pred_seqs = []
+    n_batches = (len(seqs) - seq_len - pred_len + 1) // batch_sz
+    n_batches -= int(np.ceil(pred_len / seq_len))
+    pred_seqs = np.zeros(
+        (n_batches * batch_sz, pred_len),
+        dtype=np.float32
+    )
+    # import pdb
+    # pdb.set_trace()
+
+    # losses = np.zeros(4, dtype=np.float32)  # aggregate compute_loss results
+    losses = np.zeros((3, pred_len), dtype=np.float32)  # aggregate compute_loss results
     losses_count = 0
+
     # OPT: to prevent allocating new matrixes in loop
     xs = np.zeros((batch_sz, seq_len, seqs.shape[2]), dtype=np.float32)
     ys = np.zeros((batch_sz, pred_len), dtype=np.float32)
 
     lr = LinearRegression() if extrapolate_features else None
 
-    print("\n### len(seqs)={} seq_len={} pred_len={}, batch_sz={}".format(
-        len(seqs), seq_len, pred_len, batch_sz,
-    ))
+    # print("\n### len(seqs)={} seq_len={} pred_len={}, batch_sz={}".format(
+    #     len(seqs), seq_len, pred_len, batch_sz,
+    # ))
 
-    for i in range(0, len(seqs) - seq_len - pred_len + 1, batch_sz):
-        if i + batch_sz > seqs.shape[0]:
-            break
+    for i in range(0, batch_sz * n_batches, batch_sz):
+        # if i + batch_sz > seqs.shape[0]:
+        #     break
 
-        print("\n> Predicting (now at %d)..." % i)
+        print("> Predicting (now at %d)..." % i)
 
         xs[:, :, :] = seqs[i: i + batch_sz, :, :]
         ys.fill(0)
@@ -501,33 +518,57 @@ def walk_and_predict_all_batch(
         if extrapolate_features and xs.shape[2] > 1:
             extrapf_xs = _extrapolate_multi_features(lr, xs[:, :, 1:], pred_len)
 
+        start_ys = xs[:, -1:, 0].copy()
+        target_ys = seqs[
+            i + pred_len: i + batch_sz + pred_len,
+            -pred_len:,
+            0
+        ]
+
         for j in range(pred_len):
-            ys[:, j] = model.predict(xs)[:, 0]
+            # predict
+            y_preds = model.predict(xs)[:, 0]
+            # store predicted value as last of input seq and shift the other ones
+            ys[:, j] = y_preds
             xs[:, 0: -1, :] = xs[:, 1:, :]  # shift left
-            xs[:, -1, 0] = ys[:, j]  # put predicted value as last value
+            xs[:, -1, 0] = y_preds  # put predicted values as last values
+            # extrapolate values of other features for the added data point
             if extrapolate_features and xs.shape[2] > 1:
                 xs[:, -1, 1:] = extrapf_xs[j]
 
-        for ys_idx in range(batch_sz):
-            pred_seqs.append(ys[ys_idx].copy())
+        pred_seqs[i: i + batch_sz, :] = ys
 
-            loss = compute_loss(
-                ys[ys_idx, -1],
-                seqs[i + ys_idx + pred_len, -1, 0],
-                seqs[i + ys_idx, -1, 0]
-            )
-            if loss is not None:
-                losses += loss
-                losses_count += 1
-            else:
-                print("WARNING: can't compute loss for prediction at index %d" % (
-                    i
-                ))
+        # compute losses
+        dir_accs = (ys - start_ys) * (target_ys - start_ys) > 0
+        dir_accs = dir_accs.astype(int)
+        losses[0] += dir_accs.sum(0)  # direction accuracy
+        losses[1] += np.sum((target_ys - ys) ** 2, 0)  # RMSE
+        losses[2] += np.sum((target_ys - start_ys) ** 2, 0)  # constant pred. RMSE
+        losses_count += batch_sz
 
-    losses[0] /= losses_count
-    losses[1] /= losses_count
-    losses[2] = np.sqrt(losses[2] / losses_count)
-    losses[3] = np.sqrt(losses[3] / losses_count)
+        # if i == 10:
+        #     import pdb
+        #     pdb.set_trace()
+
+        # for ys_idx in range(batch_sz):
+        #     pred_seqs.append(ys[ys_idx].copy())
+
+        #     loss = compute_loss(
+        #         ys[ys_idx, -1],
+        #         seqs[i + ys_idx + pred_len, -1, 0],
+        #         seqs[i + ys_idx, -1, 0]
+        #     )
+        #     if loss is not None:
+        #         losses += loss
+        #         losses_count += 1
+        #     else:
+        #         print("WARNING: can't compute loss for prediction at index %d" % (
+        #             i
+        #         ))
+
+    losses[0, :] /= losses_count
+    losses[1, :] = np.sqrt(losses[1, :] / losses_count)
+    losses[2, :] = np.sqrt(losses[2, :] / losses_count)
 
     return pred_seqs, losses
 
