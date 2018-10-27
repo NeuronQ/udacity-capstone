@@ -30,3 +30,17 @@
 * TODO 5. Review text according to guidelines
 
 * TODO 6. Review whole pack and submit
+
+###
+0:300
+  10: 49-71
+  6: 62-71
+  3: 70-71 !!
+500:800
+  10: 71
+  6: 70-71
+  3: 71-72 !!
+700:1000
+  10: 57-70
+  6: 50-75
+  3: 66-75

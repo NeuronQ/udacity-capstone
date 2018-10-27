@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 def simple_plot(
     data, xticks_span=1, show_xlabels=True, show_markers=False, title=''
 ):
-    fig = plt.figure(figsize=(10, 3))
+    fig = plt.figure(figsize=(10, 3), facecolor='white')
     ax = fig.add_subplot(1, 1, 1)
     # axes
     if show_xlabels:

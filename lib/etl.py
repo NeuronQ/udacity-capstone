@@ -189,3 +189,33 @@ def add_derived_features(data_df, extra_data_df):
         )
 
     return out
+
+
+def augment(data_df, extra_df, last_n, suffix):
+    # add extra_df's "close" column to data_df
+    out_df = data_df.join(extra_df.loc[:, ('close',)], rsuffix=suffix)
+    regr = linear_model.LinearRegression()
+    for i in range(last_n, len(out_df)):
+        # get last_n previous data (skip missing) for trend
+        trend_data = out_df.iloc[i - last_n: i]['close' + suffix].dropna()
+
+        # skip trying to get trend from 1 or less points
+        if len(trend_data) <= 1:
+            console.log('WARNING: insufficient data at', i)
+            continue
+
+        # fit a simple linear regression on trend data
+        xs = trend_data.index.values.reshape((-1, 1))
+        ys = trend_data.values.reshape((-1, 1))
+        regr.fit(xs, ys)
+        # get trend slope and R2 score from LR model
+        trend_slope = regr.coef_[0][0]
+        trend_r2 = regr.score(xs, ys)
+
+        # add trend slope and R2 to returned df
+        out_df.loc[out_df.index[i], ('slope' + suffix, 'r2' + suffix)] = (
+            trend_slope,
+            trend_r2
+        )
+
+        return out_df
