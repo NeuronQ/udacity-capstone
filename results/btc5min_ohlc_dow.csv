@@ -1,8 +1,4 @@
 model_description,train_from,train_to,test_on,shuffle,normalize,training_loss,rmse,rmse_cp,dir_acc
-model_description,train_from,train_to,test_on,shuffle,normalize,training_loss,rmse,rmse_cp,dir_acc
-model_description,train_from,train_to,test_on,shuffle,normalize,training_loss,rmse,rmse_cp,dir_acc
-model_description,train_from,train_to,test_on,shuffle,normalize,training_loss,rmse,rmse_cp,dir_acc
-model_description,train_from,train_to,test_on,shuffle,normalize,training_loss,rmse,rmse_cp,dir_acc
 "RNN(100|0.1|50|0.1|linear, RMSprop, mse) close,weekday,open,high,low,volume batch_size=512 epochs=3 seq_len=100 pred_len=100",0,25000,3000,False,seqs,6.1427e-04),0.0245%,0.0173%,45.7422%
 "RNN(100|0.1|50|0.1|linear, RMSprop, mse) close,weekday,open,high,low,volume batch_size=512 epochs=3 seq_len=100 pred_len=100",3000,28000,3000,False,seqs,5.3353e-04),0.1144%,0.0122%,58.3594%
 "RNN(100|0.1|50|0.1|linear, RMSprop, mse) close,weekday,open,high,low,volume batch_size=512 epochs=3 seq_len=100 pred_len=100",6000,31000,3000,False,seqs,8.3592e-04),0.0326%,0.0085%,48.6328%

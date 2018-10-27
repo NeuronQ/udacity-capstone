@@ -250,7 +250,7 @@ def run_walk_forward_validation_rnn(
 
         # return results/stats
         out.update(
-            training_loss='{:.4e})'.format(final_training_loss),
+            training_loss='{:.4e}'.format(final_training_loss),
             rmse='{:.4f}%'.format(rmse),
             rmse_cp='{:.4f}%'.format(rmse_cp),
             dir_acc='{:.4f}%'.format(dir_acc),
