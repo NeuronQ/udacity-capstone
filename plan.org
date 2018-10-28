@@ -17,10 +17,10 @@
 *** DONE 2.2.4 using OHLC + day of week + SP500 derived feature
 *** DONE 2.2.6 using OHLC + day of week + SP500 derived feature + news sentiment last 7 days
 
-** TODO 2.3 stock @24h
+** DONE 2.3 stock @24h
 *** DONE 2.3.1 using `close`
-*** TODO 2.3.2 using OHLC + day of week
-*** TODO 2.3.3 using OHLC + BC@24h derived feature
+*** DONE 2.3.2 using OHLC + day of week
+*** DONE 2.3.3 using OHLC + BC@24h derived feature
 
 * TODO 3. Write text
 
