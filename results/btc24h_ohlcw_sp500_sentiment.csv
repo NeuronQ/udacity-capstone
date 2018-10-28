@@ -1,0 +1,8 @@
+model_description,train_from,train_to,test_on,shuffle,normalize,training_loss,rmse,rmse_cp,dir_acc
+"RNN(7|0.1|7|0.1|linear, RMSprop, mse) close,weekday,open,high,low,volume,slope_sp500,r2_sp500,sentiment_last30d batch_size=10 epochs=6 seq_len=7 pred_len=7",0,300,300,False,seqs,7.7831e-03,0.0946%,0.1026%,63.0769%
+"RNN(7|0.1|7|0.1|linear, RMSprop, mse) close,weekday,open,high,low,volume,slope_sp500,r2_sp500,sentiment_last30d batch_size=10 epochs=6 seq_len=7 pred_len=7",300,600,300,False,seqs,6.7242e-03,0.0936%,0.1138%,75.3846%
+"RNN(7|0.1|7|0.1|linear, RMSprop, mse) close,weekday,open,high,low,volume,slope_sp500,r2_sp500,sentiment_last30d batch_size=10 epochs=6 seq_len=7 pred_len=7",600,900,300,False,seqs,7.8352e-03,0.1499%,0.1929%,76.9231%
+"RNN(7|0.1|7|0.1|linear, RMSprop, mse) close,weekday,open,high,low,volume,slope_sp500,r2_sp500,sentiment_last30d batch_size=10 epochs=10 seq_len=7 pred_len=7",0,300,300,False,seqs,5.7684e-03,0.0797%,0.1026%,68.0769%
+"RNN(7|0.1|7|0.1|linear, RMSprop, mse) close,weekday,open,high,low,volume,slope_sp500,r2_sp500,sentiment_last30d batch_size=10 epochs=10 seq_len=7 pred_len=7",300,600,300,False,seqs,5.2737e-03,0.1050%,0.1138%,70.0000%
+"RNN(7|0.1|7|0.1|linear, RMSprop, mse) close,weekday,open,high,low,volume,slope_sp500,r2_sp500,sentiment_last30d batch_size=10 epochs=10 seq_len=7 pred_len=7",600,900,300,False,seqs,7.0861e-03,0.1443%,0.1929%,74.2308%
+model_description,train_from,train_to,test_on,shuffle,normalize,training_loss,rmse,rmse_cp,dir_acc

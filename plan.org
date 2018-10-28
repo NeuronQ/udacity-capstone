@@ -10,16 +10,15 @@
 *** DONE 2.1.1 using `close`
 *** DONE 2.1.3 using OHLC + day of week
 
-** TODO 2.2 BC @24h
+** DONE 2.2 BC @24h
 *** DONE 2.2.1 using `close`
 *** DONE 2.2.2 using OHLC
 *** DONE 2.2.3 using OHLC + day of week
 *** DONE 2.2.4 using OHLC + day of week + SP500 derived feature
-*** TODO 2.2.5 using OHLC + day of week + news sentiment last 7 days
-*** TODO 2.2.6 using OHLC + day of week + SP500 derived feature + news sentiment last 7 days
+*** DONE 2.2.6 using OHLC + day of week + SP500 derived feature + news sentiment last 7 days
 
 ** TODO 2.3 stock @24h
-*** TODO 2.3.1 using `close`
+*** DONE 2.3.1 using `close`
 *** TODO 2.3.2 using OHLC + day of week
 *** TODO 2.3.3 using OHLC + BC@24h derived feature
 

@@ -143,6 +143,8 @@ def normalized_seqs_cols(seqs):
             assert feature_seq.shape == (seqs.shape[1],)
             if feature_seq[0] == 0:
                 continue
+            if np.isnan(feature_seq[0]):  # it's caller's responsibility to avoid NaNs!
+                continue
             feature_seq /= feature_seq[0]
             feature_seq -= 1
             assert feature_seq[0] == 0, "%f != %f" % (
@@ -191,15 +193,47 @@ def add_derived_features(data_df, extra_data_df):
     return out
 
 
+def augment_with_news_sentiment(data_df, extra_df, last_n_days, suffix):
+    # add extra_df's "close" column to data_df
+    out_df = data_df.join(extra_df.loc[:, ('sentiment',)])
+
+    out_df['sentiment' + suffix] = pd.Series(
+        np.zeros(len(out_df)), index=out_df.index)
+
+    regr = linear_model.LinearRegression()
+    for i in range(last_n_days, len(out_df)):
+        # get last_n_days previous data (skip missing) for trend
+        current_t = out_df.iloc[i].name
+        sentiment = out_df[
+            (out_df.index > current_t - pd.to_timedelta(last_n_days, unit='d')) &
+            (out_df.index <= current_t)
+        ]['sentiment'].dropna()
+
+        # if current_t == pd.Timestamp('2015-10-01'):
+        #     import pdb; pdb.set_trace()
+
+        # skip trying to get trend from 0 less points
+        if len(sentiment) == 0:
+            # print('WARNING: insufficient data at', i)
+            continue
+
+        # add sentiment mean for last
+        out_df.loc[out_df.index[i], ('sentiment' + suffix)] = (
+            sentiment.values.mean(),
+        )
+
+    return out_df
+
+
 def augment(data_df, extra_df, last_n, suffix):
     # add extra_df's "close" column to data_df
     out_df = data_df.join(extra_df.loc[:, ('close',)], rsuffix=suffix)
-    
+
     out_df['slope' + suffix] = pd.Series(
         np.zeros(len(out_df)), index=out_df.index)
     out_df['r2' + suffix] = pd.Series(
         np.zeros(len(out_df)), index=out_df.index)
-    
+
     regr = linear_model.LinearRegression()
     for i in range(last_n, len(out_df)):
         # get last_n previous data (skip missing) for trend
@@ -207,7 +241,7 @@ def augment(data_df, extra_df, last_n, suffix):
 
         # skip trying to get trend from 1 or less points
         if len(trend_data) <= 1:
-            console.log('WARNING: insufficient data at', i)
+            print('WARNING: insufficient data at', i)
             continue
 
         # fit a simple linear regression on trend data
