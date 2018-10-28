@@ -1,0 +1,4 @@
+model_description,train_from,train_to,test_on,shuffle,normalize,training_loss,rmse,rmse_cp,dir_acc
+"RNN(3|0.1|3|0.1|linear, RMSprop, mse) close batch_size=10 epochs=6 seq_len=7 pred_len=7",0,300,300,False,seqs,5.3728e-03,0.0704%,0.1022%,71.5385%
+"RNN(3|0.1|3|0.1|linear, RMSprop, mse) close batch_size=10 epochs=6 seq_len=7 pred_len=7",300,600,300,False,seqs,5.3029e-03,0.0838%,0.1147%,78.0769%
+"RNN(3|0.1|3|0.1|linear, RMSprop, mse) close batch_size=10 epochs=6 seq_len=7 pred_len=7",600,900,300,False,seqs,5.2583e-03,0.1521%,0.1967%,74.2308%
