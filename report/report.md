@@ -122,3 +122,79 @@ $$
 (In our Python code we use `min_eps_ct` for $(\text{fee}+\text{spread})/2$ since it's constant with respect to almost everything else.)
 
 Since we only care about the sign of profit being positive in this discussion, we can take the traded quantity to be $1$ here omit it from the equations. Now we can use this $MinProfitableDACC$ as a **threshold of minimal change direction prediction accuracy that our models should aim to exceed**.
+
+
+## II. Analysis [2-4 pages]
+
+### Data exploration [1 page]
+The datasets used in these project are the following:
+
+#### The BTC-USD Bitcoin historical price datasets
+
+The **300 sec. (5 min.) interval dataset** comprises data collected at this resolution between **1 Feb 2015** and **9 Oct 2018**, obtained from the Coinbase Pro API (formerly GDAX, later acquired by Coinbase). There are **388,209 data points in total**. For 1633 time points of these 5 min. spaced series data was missing, and it filled in using a fill-forward way (a missing data point was filled with the previous in time data point's data). Features for each data point:
+- **close (C)** - price at the end of time interval ("closing price")
+- **open (O)** - price at the beginning of time interval
+- **high (H)** - maximum price reached in interval
+- **low (L)** - minimum price reached in interval
+- **volume (V)** - amount of currency/stock exchanged in time interval
+
+Higher frequency data set can be available, but historical datasets have lots of missing data points at these resolutions, and acquiring data in real time was not feasible for the time/effort available for this project.
+
+It is worth having a quick look at the overall shape of the data by plotting open and close features, and at the standard deviation for a given "window" (shown here is a window of 100, which also turned out to be a useful one for prediction):
+
+![](./f1.btc5min_and_stdev100.png)
+[Fig. 1 - BTC-USD at 5 min. & SD]
+
+The **daily dataset** contains 1351 data points with same features (OHLCV). A similar plot to the one for 5 min data confirm the expectation that the shape of the data is the same:
+
+![](./f2.btc24h_and_stdev7.png?v=5)
+[Fig. 2 - BTC-USD at 24 h & SD]
+
+(From these plots we can also see obvious and expected facts like the data being non-stationary.)
+
+#### The stock prices datasets
+
+NASDAQ prices for 6 companies (identified by stock ticker symbol) make up 6 datasets of similarly structured OHLCV data. Data was clipped to the 2015-03-02 - 2018-10-12 time interval to ensure we have data for all companies for the same interval.
+
+![](./f3.stocks.png)
+[Fig. 3 - stocks daily]
+Two of these companies, NVidia and AMD, are obviously not what we'd call "Bitcoin involved companies", but theirs stock prices could somewhat correlate with BTC price since they produce hardware relevant for mining.
+
+#### S&P 500 data
+
+For the same interval as for the stocks we have similar OHLC data for the S&P 500 index:
+
+![](./f4.sp500.png)
+[Fig. 4 - SP500 daily]
+
+### News headlines data
+
+A dataset consisting of 173,372 news headlines for the dates between 2015-02-01 and 2017-12-31.
+
+### Exploratory Visualization [2 page]
+
+The (open, high, low, close, volume) type data for BTC-USD exchange rate and for stock prices can be easily visualized in a compact and simple lines + area chart. These are two examples for BTC-USD at 24 h and at 5 min resolution:
+
+![](./f5.lines_ohlc_btc24h_example.png)
+[Fig. 5 - BTC at 24 h OHLC lines chart example]
+
+![](./f6.lines_ohlc_btc5min_example.png)
+[Fig. 6 - BTC at 5 min. OHLC lines chart example]
+
+(The volume data is from different exchanges too, hence the units difference, but we're only interested in traded volume variation in general anyway.)
+
+Note the usage of a shaded gray area for the low - high interval, and a secondary axis for the traded volume. Combined with zooming-in and out, this visual representation is pretty good for navigating through the data.
+
+The more traditional "candle-stick" visualization for OHLC data that most traders prefer can also be used:
+
+![](./f7.candles_btc24h_example.png)
+[Fig. 7 - BTC at 24 h, candlestick chart example]
+
+In a "candlestick" chart the thick box portion spans between open and closing price for an interval, and the thin "whiskers" span to the minimum and maximum that were reached in this interval. Color and/or shading is used to show in which interval the open price was lower than closing price (usually represented green and/or unfilled) or the opposite (usually red and/or filled).
+
+It can also be interesting to visualize an additive decomposition of our time series data (taking only the closing price feature), into (1) trend component (general systematic component that changes over time and does not repeat), (2) seasonal component (changes over time and repeats) and (3) residual/noise component (does not follow any systematic pattern). In the following graph, the blue component (closing price) is the sum of all the others:
+
+![](./fX.decompose_btc5min.png)
+[Fig. 8 - BTC at 5 min seasonal additive decomposition: blue - close, green - trend, orange - seasonal, red - residual/noise]
+
+This shows us that there is structure in our data, at multiple levels. But it's doubtful whether this can be of any practical value, but we can see clearly that (a) the data has a trend, and (b) there *could* be some seasonal components.

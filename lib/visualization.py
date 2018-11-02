@@ -9,10 +9,12 @@ import matplotlib.pyplot as plt
 
 
 def simple_plot(
-    data, xticks_span=1, show_xlabels=True, show_markers=False, title=''
+    data, xticks_span=1, show_xlabels=True, show_markers=False, title='',
+    show_volume=True,
 ):
-    fig = plt.figure(figsize=(10, 3), facecolor='white')
+    fig = plt.figure(figsize=(15, 5), facecolor='white')
     ax = fig.add_subplot(1, 1, 1)
+    ax.set_ylabel('price')
     # axes
     if show_xlabels:
         ax.set_xticks(data.index.values[::xticks_span])
@@ -22,12 +24,19 @@ def simple_plot(
     line_style = '|-' if show_markers else '-'
     if title:
         plt.title(title)
-    plt.plot(data.index.values, data['open'], line_style,
-             color='orangered', alpha=0.5, label='open', linewidth=1)
-    plt.plot(data.index.values, data['close'], line_style,
-             color='blue', alpha=0.5, label='close', linewidth=1)
-    plt.fill_between(
+    lopen = ax.plot(data.index.values, data['open'], line_style,
+                    color='orangered', alpha=0.6, label='open', linewidth=1)
+    lclose = ax.plot(data.index.values, data['close'], line_style,
+                     color='blue', alpha=0.6, label='close', linewidth=1)
+    lhilo = ax.fill_between(
         data.index.values, data['low'], data['high'],
-        color='gainsboro', alpha=0.5, linewidth=1)
+        color='gainsboro', alpha=0.5, linewidth=1, label='low - high')
+    ax.legend(loc=2)
+    # volume
+    if show_volume:
+        ax2 = ax.twinx()
+        lvolume = ax2.set_ylabel('volume')
+        ax2.plot(data.index.values, data['volume'], line_style,
+                 color='green', alpha=0.4, label='volume', linewidth=1)
     # legend
-    plt.legend()
+    ax2.legend(loc=1)
