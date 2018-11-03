@@ -194,7 +194,7 @@ In a "candlestick" chart the thick box portion spans between open and closing pr
 
 It can also be interesting to visualize an additive decomposition of our time series data (taking only the closing price feature), into (1) trend component (general systematic component that changes over time and does not repeat), (2) seasonal component (changes over time and repeats) and (3) residual/noise component (does not follow any systematic pattern). In the following graph, the blue component (closing price) is the sum of all the others:
 
-![](./fX.decompose_btc5min.png)
+![](./f8.decompose_btc5min.png)
 [Fig. 8 - BTC at 5 min seasonal additive decomposition: blue - close, green - trend, orange - seasonal, red - residual/noise]
 
 This shows us that there is structure in our data, at multiple levels. But it's doubtful whether this can be of any practical value, but we can see clearly that (a) the data has a trend, and (b) there *could* be some seasonal components.
@@ -278,3 +278,36 @@ This project has opted to use an established LSTM implementation (**Keras, Tenso
 Using Keras it was easy to try out various network architectures (different numbers of units, different numbers of hidden layers, activation function, and dropout layers) quickly, until we find a few that seemed promising.
 
 ### Benchmark [1 page]
+
+Besides comparing out results with data from literature (which tends to easily become an apples to oranges comparison even for such a straightforward prediction problem), three simple model benchmarks were chosen, and one "synthetic" or statistically derived "threshold of minimum accuracy for profitable strategies" benchmark was employed for comparing and evaluating our models.
+
+#### Simple model benchmarks
+
+The simple model benchmarks were:
+* **constant prediction model (CP)** - using a "model" that always predicts the previous value for comparison; this is not enough for the current use case, since there is no way to predict change direction prediction accuracy for this model (DACC), but at least it provides some bottm line for RMSE to be compared with
+* **simple linear regression on $k$ previous data points (LR)** - this is the simplest imaginable model that *can* actually serve as a meaningful benchmark for models
+* **an ARIMA (autoregressive integrated moving average) model** - due to the problem domain (financial time series predictions), it makes sense to also compare against a "classic" model for such problems; the non-stationarity of our data and the fact the a quick look at the decomposition doesn't really show any clear and direct seasonal component (decomposition with seasonal period of 30 days and 1 week was also tried, besides the yearly one shown in ***Fig. 8***), we have *no reason to believe that this model can generate useful predictions for out data*.
+
+The CP and LR models are straightforward, but the ARIMA models may be worth further discussion. It is a model with three components:
+* **integration/differencing (I, order $d$)** - simply differencing past values to remove trend, done before trying to fit the other parameter:
+  $X_t' = (X_t - X_{t-1}) - (X_{t-1} - X_{t-2}) - \dots - (X_{t-d+1} - X_{t-d})$
+* **auto-regressive (AR, order $p$, fittable params $\alpha_i$):**
+  $X_{t}^{\text{AR}(p)} = \alpha_{1} X_{t-1} + \dots + \alpha_k X_{t-p}$
+* **moving average (MA, order $q$, fittable params $\theta_i$):**
+  $X_{t}^{\text{MA}(q)} = \varepsilon_{t} + \theta_{1} \varepsilon_{t-1} + \cdots + \theta_{q} \varepsilon_{t-q}$
+* ...summing up to:
+  $X_t^{'\text{AR}(p)\text{ I}(d)\text{ MA}(q)} = X_{t}^{'\text{AR}(p)} + X_{t}^{'\text{MA}(q)}$
+
+The three hyperparameters $(p, d, q)$ that are usually determined semi-empirically after some statistical analysis via ACF (total auto correlation function) and PACF (partial auto correlation function) plots. For the BTC-USD @ 5 min data these look like this:
+
+![](./f11.acf_and_pacf_for_btc5min.png)
+[Fig. 11 - ACF and PACF plots for BTC-USD @ 5 min]
+
+The ACF plot represents the correlation between a timeseries and itself lagged, eg. for a lag $k$ we measure correlation between $x_t$ and $x_{t-k}$. An exponentioal decrease can be expected for an AR process ACF plot. An abrupt decrease after $q$ few points can be expected for an MA(q) process. But since these can be summed up, not much difference can be seen between an AR and an AR+MA process on a total auto correlation plot. We also can't easily see the order of an AR process.
+
+The PACF plot shows the correlation between a timeseries and itself lagged, subtracting from this the effect of the correlation with the previous timesteps, eg. "how much is $x_t$ correlated with $x_{t-k}$ if we subtract the effect of the correlation with $\{x_{t-1}, \dots, x_{t-k+1}\}$". This is should be able to see the AR order $p$ on an PACF plot as the number of leading bars higher than a threshold after which they abruptly decrease. For example, the plot above suggests that an AR(2) model could be used to model our data.
+
+Integrating this with the fact that we also have a trend in our data, we can see that it's a good idea to start from an ARIMA(2,1,0) or ARIMA(2,1,1) and make further adjustments from here. Also, the ACF and PACF plots look quite similar for the other series (BTC at 14 h, S&P 500 and stock daily), so (2,1,0) can be used as a starting point for all the others too.
+
+> TODO: run ARIMA on server again with these params, them make a nice plot with LR + ARIMA predictions
+
