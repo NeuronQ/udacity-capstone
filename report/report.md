@@ -5,9 +5,9 @@ Machine Learning Engineer Nanodegree
 
 ### Project overview [1-2 paragraphs]
 
-Building **models that can predict the future evolution of easily tradeable financial tools such as stocks, or of crypto-currencies such as Bitcoin**, is a topic of great interest for traders and investors. Such predictions can guide both investment strategies and speculative trading. Using so called **deep leaning techniques** (multi-layered neural networks) to build such models is still in its infancy, and **and recurring neural networks** (RNNs) seem a good fit for this kind time-dependent data. In this report we are interested in building predictive models for trading, investigating whether we can obtain good enough predictions to guide potentially successful trading strategies. The models we are building and tuning are **long short-term memory (LSTM) RNNs**.
+Building **models that can predict the future evolution of easily tradeable financial tools such as stocks, or of crypto-currencies such as Bitcoin**, is a topic of great interest for traders and investors. Such predictions can guide both investment strategies and speculative trading. Using so called **deep leaning techniques** (multi-layered neural networks) to build such models is still in its infancy, and **recurrent neural networks** (RNNs) seem a good fit for this kind time-dependent data. In this report we are interested in building predictive models for trading, investigating whether we can obtain good enough predictions to guide potentially successful trading strategies. The models we are building and tuning are **long short-term memory (LSTM) RNNs**.
 
-These problem we are attacking here is *just one particular case of applying machine learning to the prediction of time series data.* It is possible that work done on such models could generalize to more "socially useful" time series prediction problems, like *predicting electric energy consumption, water consumption or food prices.*
+These problem we are attacking here is *just one particular case of applying machine learning (ML) to the prediction of time series data.* It is possible that work done on such models could generalize to more "socially useful" time series prediction problems, like *predicting electric energy consumption, water consumption or food prices.*
 
 We will attempt to first **predict the price of Bitcoin (BTC)** in USD based on historical data of medium frequency (5 min) and low frequency (daily) comprised of the regular price values (open, high, low, close) and trading volume, augmented with extra data derived from the S&P 500 Index (SP500) taken as a rough general marker for the "health of US and West-European economy". (A mini-experiment in adding an extra feature representing "Bitcoin related sentiment of recent news" obtained from using Google Clod Natural Language API for sentiment analysis on a subset of news headlines filtered for Bitcoin related keywords was also carried out, but mainly as a proof-of concept for the technique - the actual historical news data was not enough and not diverse enough, and acquiring and processing better quality news data would have increased the scope of this project too much.)
 
@@ -198,3 +198,83 @@ It can also be interesting to visualize an additive decomposition of our time se
 [Fig. 8 - BTC at 5 min seasonal additive decomposition: blue - close, green - trend, orange - seasonal, red - residual/noise]
 
 This shows us that there is structure in our data, at multiple levels. But it's doubtful whether this can be of any practical value, but we can see clearly that (a) the data has a trend, and (b) there *could* be some seasonal components.
+
+
+### Algorithms and Techniques [1 page]
+
+The models developed all belong to a class of **recurrent neural networks** (RNNs) called **long short-term memory (LSTM) RNNs**.
+
+#### Background on NN and RNN algorithms
+
+Neural networks (NNs, aka "artificial neural networks" or ANNs) are computing systems vaguely inspired by the biological neural networks that constitute animal brains. These systems have a set of tunable parameters called *weights* (they could be considered somewhat analogous to "synaptic connection strength" in biological neuronal networks). When combined with an effective learning algorithm, they can be very effective machine learning models. The multi-layered configuration of these models (which spawned an entire sub-field of ML called **deep learning**) is one of the most effective general-purpose tools in ML that also scales well to large volumes of training data.
+
+RNNs are a class of neural networks in which some of the connections for cycles, as opposed to feedforward neural networks which have no cycles in their connections structure. In the simplest such of network formed of 3 layers (sometimes also referred to as 2 layers + input), the practically usable cyclical connection is between the hidden layer units and themselves (or between hidden layer units at $t_k$ and same units at $t_{k-1}$). This leads us to these structures and equations for the simplest possible feedforward and recurrent neural networks that can be of practical use:
+
+![](./f9.ffnn_vs_rnn.png?v=3)
+[Fig. 9 - Feed-forward NN vs RNN; RNN unfolded through time]
+
+The simple feed-forward NN can be described by an equation such like the following (for the actual practical case of running a *batch* of samples at once through the network, that is closest to the actual code; the ones for one sample are similar but with $x$ and $h$ vectors instead of matrices):
+
+$$
+H = f_h(X \cdot W_{xh}) \\
+Y = f_y(H \cdot W_{hy})
+$$
+
+where $X$ is the input matrix (usually shaped `samples` $\times$ `features`), $W_hx$ is the matrix of weights connecting the input layer with the hidden layer (`features` $\times$ `num_of_hidden_layer_units`), $f_h$ the hidden layer activation function, $H$ is the matrix of hidden layer activations (`samples` $\times$ `num_of_hidden_layer_units`), $W_{hy}$ the matrix of weights from the hidden layer to the output layer (`num_of_hidden_layer_units` $\times$ `num_of_output_layer_units`), $f_h$ the output layer activation function, and $\cdot$ (the dot operator) is matrix multiplication. The activation functions are non-linear. There is also a bias that gets added for every layer, buy we can imagine it's an extra neuron with output fixed to 1, or an extra column of ones added to $X$ and an extra row of weights added to $H$ and so on for following layers except output (or equivalently an extra additive term $b$).
+
+Or in more general form, activation for a layer $l$ of any such simple feed-forward NN is: $ A^l = f\left( A^{l-1} W^l \right) $.
+
+For the RNN the eq. become:
+
+$$
+H_t = f_h(X \cdot W_{xh} + H_{t-1} \cdot W_{hh})
+    \equiv f_h([X, H_{t-1}] \cdot W_h) \\
+Y = f_y(H \cdot W_{hy})
+$$
+
+(The $[X, H_{t-1}]$ variant refers to horizontal concatenation of matrices and here $W_h$ means *all* the incoming weights for the hidden layer - it's just two ways of expressing the same mathematical operations.)
+
+Learning in feed-forward neural networks is achieved by computing the gradient of a *loss function* (a good choice for regression problems could be mean-squared-error) with respect to each weight, then updating the weights based on this gradient and a set learning rate. This algorithm is called back-propagation.
+
+The batch/matrix form backpropagation equations for a feed-forward NN end up being (for a layer $l$):
+
+$$
+\delta^l = f' \left( A^{l-1} W^l \right) * (\delta^{l+1} \, (W^{l+1})^T) \\
+W^l \leftarrow W^l + \eta (A^{l-1})^T \delta^l
+$$
+
+Here "$*$" is element-wise multiplication, $\eta$ is the learning rate, and $\delta^l$ are the activation gradients for a layer $l$, and $f'$ is the derivative of the activation function.
+
+A simple way to apply the same learning algorithm to RNNs is by *unfolding them in time*: instead of the original network, we take a network made out of $k$ copies of the original network (for $k$ steps in time to unfold), constrain every copy of the network to share the same parameters, and train the network with a series of $k$ successive ordered training samples.
+
+#### LSTMs
+
+RNNs suffere from the problem of not being able to learn patterns across large intervals of time. A solution to this has been to replace the simple hidden layer of RNNs with "cells": modules composed of multiple layers with specific activation functions and connected in very specific ways, combined with an actual statefull layer that persists state across time, and to which the other layers can write/erase/read.
+
+The first successful RNN cell system has been that called LTST - long short-termn memory. This model integrates a persistent state multiple inner layers called *gates.*
+
+It is best visualized in a diagram (here the green "cell" is what replaces the simple hidden layer from the diagram of the RNN unrolled across time):
+
+![](./f10.lstm.png)
+[Fig. 10 - LSTM diagram (based on Wikipedia diagram by Guillaume Chevalier from https://en.wikipedia.org/wiki/Long_short-term_memory#/media/File:The_LSTM_cell.png - CC BY 4.0)]
+
+The batch/matrix equations for forward-propagation in a LSTM cell (the operations are all represented in the diagram above) are:
+
+$$
+H_t = O_t * \tanh ( C_t ) \\
+O_t = \sigma ( [X_t, H_{t-1}] \cdot W_O ) \\
+C_t = F_t * C_{t-1} + I_t * \tilde{C_t} \\
+F_t = \sigma( [X_t, H_{t-1}] \cdot W_F ) \\
+I_t = \sigma( [X_t, H_{t-1}] \cdot W_I ) \\
+\tilde{C_t} = \tanh( [X_t, H_{t-1}] \cdot W_C ) \\
+$$
+
+The back-propagation-through-time equations can be adapted to this kind of network. No new mathematical insight is needed for this, but the derivation is lengthy, and there's probably room for lots of optimizing tricks at the code level.
+
+#### Chosen implementation
+
+This project has opted to use an established LSTM implementation (**Keras, TensorFlow backend, GPU accelerated**) instead of implementing from scratch a LSTM network based on the equations above. Nevertheless, *the settings have been chosen to have the coded model be faithful to a model represented by the equations above, avoiding the more complex/exotic variations.*
+
+Using Keras it was easy to try out various network architectures (different numbers of units, different numbers of hidden layers, activation function, and dropout layers) quickly, until we find a few that seemed promising.
+
+### Benchmark [1 page]
