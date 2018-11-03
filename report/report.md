@@ -123,6 +123,8 @@ $$
 
 Since we only care about the sign of profit being positive in this discussion, we can take the traded quantity to be $1$ here omit it from the equations. Now we can use this $MinProfitableDACC$ as a **threshold of minimal change direction prediction accuracy that our models should aim to exceed**.
 
+It is important to note though that this kind of threshold model makes no assumption bout the amount that can be traded, the number of trades that can be made, the variability in time of the threshold itself (a trading strategy that needs a large number of trades to have a statistically significant chance of being profitable would also need a large period of *time* to make this trades and while time elapses the volatility of the asset can change), or of any limit of money that a trader can loosing before becoming "bankrupt" and having no more money to keep trading. Considering this and the source of this model, it is important to note that *it's probably only applicable to high frequency trading of very volatile assets, hence it's not necessarily expected to be of any use for data at time intervals larger than 5min.*
+
 
 ## II. Analysis [2-4 pages]
 
@@ -288,6 +290,8 @@ The simple model benchmarks were:
 * **simple linear regression on $k$ previous data points (LR)** - this is the simplest imaginable model that *can* actually serve as a meaningful benchmark for models
 * **an ARIMA (autoregressive integrated moving average) model** - due to the problem domain (financial time series predictions), it makes sense to also compare against a "classic" model for such problems; the non-stationarity of our data and the fact the a quick look at the decomposition doesn't really show any clear and direct seasonal component (decomposition with seasonal period of 30 days and 1 week was also tried, besides the yearly one shown in ***Fig. 8***), we have *no reason to believe that this model can generate useful predictions for out data*.
 
+A big downside of these simple model is of course the fact that they only work with one feature (closing price). Finding ways to extend these benchmark models to use the extra features was not considered to bet worth the time/effort here.
+
 The CP and LR models are straightforward, but the ARIMA models may be worth further discussion. It is a model with three components:
 * **integration/differencing (I, order $d$)** - simply differencing past values to remove trend, done before trying to fit the other parameter:
   $X_t' = (X_t - X_{t-1}) - (X_{t-1} - X_{t-2}) - \dots - (X_{t-d+1} - X_{t-d})$
@@ -309,5 +313,41 @@ The PACF plot shows the correlation between a timeseries and itself lagged, subt
 
 Integrating this with the fact that we also have a trend in our data, we can see that it's a good idea to start from an ARIMA(2,1,0) or ARIMA(2,1,1) and make further adjustments from here. Also, the ACF and PACF plots look quite similar for the other series (BTC at 14 h, S&P 500 and stock daily), so (2,1,0) can be used as a starting point for all the others too.
 
-> TODO: run ARIMA on server again with these params, them make a nice plot with LR + ARIMA predictions
+If we run these models in a walk-forward incremental fashion: starting from a point in time $t$, predict the next point, then add the predicted point as the last one in a window of $k$ points ranging from $t-1$ to $t-k+1$ (a $t : t-k$ window shifted left with the predicted value added last), and repeat the process $n$ times as we move to predict at time $t+n$ in the end. This *is obviously irrelevant for the LR model since the results for a simple linear model would be the same even if point $k$ ahead was predicted directly, but it's worth mentioning with respect to ARIMA since the same strategy is used for LSTM models too.* We can plot these predictions easily, for example here we can see LR and ARIMA(2,1,1) predictions side by side on the same interval (figure note: LR model has different margins because for code-consistency reasons it runs on similar code with the LSTM model, while the ARIMA model was implemented separately due to its peculiarities; also RMSE for LR model is in normalized units while for ARIMA in price units, but we're only interested in comparing with constant prediction model here, and conversion is possible if we ever need).
+
+![](./f12.lr_and_arima_predictions_sample.png?v=2)
+[Fig. 12 - sample incremental prediction for LR and ARIMA benchmark models]
+
+The results are *significantly worse than random change direction guessing for LR model DACC*. In the figure above the ARIMA model performs worse than random direction guessing (41.75%), but on average it's slightly better, oscillating at 55% ± 2%.
+
+> **TODO:** add/update LR and ARIMA averages in the paragraph above and for all data series
+
+#### Attempting to derive a minimum profitable accuracy threshold
+
+Using the statistic heuristic formula for MinProfitableDACC defined at the end of the "Metrics" section, we can try and estimate these minimum threshold accuracies for our data. For daily data we look at these thresholds for 3 to 7 days ahead:
+
+| Data set | 3 days | 4 days | 5 days | 6 days | 7 days |
+|----------|---|---|---|---|---|
+| BTC-USD@24h (all) | 54.10% | 52.77% | 52.23% | 51.88% | 51.67% |
+| BTC-USD@24h (latest 3 months) | 50.27% | 50.18% | 50.14% | 50.12% | 50.11% |
+[ Table 1 - MinProfitableDACC for BTC 24h data ]
+
+![](./f13.min_profitable_dacc_btc24.png)
+[ Fig. 13 - minimum profitable change direction prediction accuracy as a function of how many steps ahead we predict ]
+
+We can see that they are decreasing, confirming the intuition that higher predictive accuracy is needed for predictions closer to the present, since there is less room less average price variation, hence less profit to be obtained for trading decision informed by a correct prediction.
+
+But other than this, **it is clear that the actual numbers can't really be trusted:** first, they look too optimistic, probably because the statistics behind them assumes no limit on what the trader can spend (eg. there's no "stop, we've run out of money") or to how many times trades can be made (this is not realistic, since as time passes the statistical properties of the time-series will also change, changing these thresholds too). Basically, **in the real world, where we don't have infinite money to invest, we aren't able to make an infinite amount of trades, and where volatility can vary in time, we'd need more pessimistic thresholds.** But there is no clear theoretical model for this "pessimism", so we're back to approaching things more empirically.
+
+For daily stocks data the thresholds computed are non-sensical (above 100%), which is expected, as this is not a threshold model intended for low volatility and/or low frequency data like stocks.
+
+For the BTC-USD @ 5 min data the numbers look a bit more plausible, at least for the whole data average (which makes sense, since this type threshold equation was born in the context of high frequency trading of high liquidity and volatility assets):
+
+| Data set | 50 (4.17h) | 75 (6.25h)  | 100 (8.33h) |
+|----------|-|-|-|
+| BTC-USD@5min (all) | n/a | 62.61% | 60.67% |
+| BTC-USD@5min (latest 3 months) | 52.70% | 52.16% | 51.85% |
+
+We can say that a target of >61% accuracy 100 time steps ahead (slightly above 8 hours) could be a minimal goal for the BUTC5min predictions.
+
 
