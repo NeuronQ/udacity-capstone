@@ -157,7 +157,7 @@ def run_walk_forward_validation_rnn(
                 y_train,
                 batch_size=batch_size,
                 epochs=epochs,
-                validation_split=0.05,
+                validation_split=0.1,
                 shuffle=False,
             )
             out['train_val_losses'].append(training_history.history)
