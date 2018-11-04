@@ -510,26 +510,62 @@ Due to the not so evident nature of some of the code, it is worth explaining her
   - predict the other features of the last element of the sequence using linear-regression on their past values inside the sequence
 - the last predicted `y` is the predicted value for time `preictions_length` * `data_interval` into the future
 
-For the number of units in the hidden LSTM layers, 3 and 3 were chosen for 24h data, and experiments were ran with increasing numbers starting from this. The heuristic used for choosing this was to have a number of units of the same order of magnitude as length of a sequence.
+> **TODO:** figure out if below to also report results for just using close feature
 
-Using a similar heuristic we picked 100 and 50 for the LSTM models used to predict 5 min data, since 100 is the picked sequence length at the 5 min resolution, with the aim of trying to both increase and decrease the size and see how end results vary.
+For predicting 24 h frequency data a LSTM model with the following configuration was used:
+* **input shape:** `sequence_lengts = 7` $\times$ `num_features`, where `num_of_features` was:
+  * **6** for open, high, low, close, volume, day of week
+  * **8** for open, high, low, close, volume, day of week, SP500 derived F1, SP500 derived F2
+  * **9** for open, high, low, close, volume, day of week, SP500 derived F1, SP500 derived F2, sentiment feature
+* **LSTM hidden layer 1:** 7 units
+* **dropout layer 1:** P = 0.1
+* **LSTM hidden layer 2:** 7 units
+* **dropout layer 1:** P = 0.1
+* **1 unit dense layer with linear activation**
+* training params:
+  * **batch size:** 32
+  * **epochs:** 100
+  * **learning rate:** 0.0001
+
+For predicting 5 min frequency data a LSTM model with the following configuration was used:
+* **input shape:** `sequence_lengts = 7` $\times$ `num_features`, where `num_of_features` was:
+  * **6** for open, high, low, close, volume, day of week
+* **LSTM hidden layer 1:** 100? units
+* **dropout layer 1:** P = 0.1
+* **LSTM hidden layer 2:** 50? units
+* **dropout layer 1:** P = 0.1
+* **1 unit dense layer with linear activation**
+* training params:
+  * **batch size:** ?
+  * **epochs:** ?
+  * **learning rate:** ?
+
+We arrived at these architecture starting with some common structures mentioned in literature and web articles, and then carrying on with lots of experimentation on small chunks of data from out set, heuristically tuning them (mostly in exponential increments, eg, batch size 16, 32, 64, 128, learning rate 0.1, 0.01 etc.). From this, further model tuning was carried out in a more systematic way, as described in the following section.
 
 ### Refinement [2 pages]
-> The process of improving upon the algorithms and techniques used is clearly documented. Both the initial and final solutions are reported, along with intermediate solutions, if necessary.
+The models that served as a model for refinements were those defined at the last section.
 
-> **TODO:** actually run more of these experiments and replace numbers with actual and reproducible ones
+Most basic refinements were picking an optimal learning rate and trying to prevent overfitting. Basis for this was plotting testing/validation losses during training:
 
-> **TODO:** plot training/validation losses
+![](./trainning_and_validation_loss.png?v=2)
+[Fig. - examples plots of training/validation loss during training on BTCH @ 24 h data]
 
-> **TODO:** maybe go for a "we changed optimizer from SGD to RMSProps" etc. here
+The graphs tuned up to be bit unintuitive, since on most of them there was no clear "point of divergence" after which validation loss would start increasing again while training loss keeps decreasing. Only a certain "chaos threshold" after which increasing the number of training epochs makes the losses vary in a seemingly chaotic fashion around a certain minimal value. Also, symptoms of overfitting (eg. "results get worse as we increase number of training epochs from this point onward") tended to appear before the points that seemed to suggest overfitting on the graph. Most of these *could be increased by the large amount of purely chaotic variation in the data* as they's what one could also see when trying to train a model on random-walk generated data.
 
+After trying to tune the optimzer's parameters a bit (optimizer we started with was `keras.optimizers.SGD`, which has optional parameters *momentum, decay* and *nesterov* boolean to use Nesterov momentum), what made the biggest improvement was actually switching to the RMSprop optimizer and using it with its default params as recommended and with a smaller learning rate, of 1e-4.
+
+> **TODO:** add comparion of results before and after adjustments
 
 ## IV. Results [2-3 pages]
+
+
 
 ### Model Evaluation and Validation [1 page]
 > The final model’s qualities — such as parameters — are evaluated in detail. Some type of analysis is used to validate the robustness of the model’s solution.
 
 - !!! figure out how to verify robustness
+
+
 
 ### Justification [1 page]
 > The final results are compared to the benchmark result or threshold with some type of statistical analysis. Justification is made as to whether the final model and solution is significant enough to have adequately solved the problem.
