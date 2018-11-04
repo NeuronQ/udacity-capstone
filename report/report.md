@@ -238,6 +238,23 @@ $$
 
 Learning in feed-forward neural networks is achieved by computing the gradient of a *loss function* (a good choice for regression problems could be mean-squared-error) with respect to each weight, then updating the weights based on this gradient and a set learning rate. This algorithm is called back-propagation.
 
+For a loss function $L$ we have this expression of the gradient with respect to a particular weight in the network (where $s_i^l = \sum_i{w^l_{ij} a^{l-1}_i}$, and $a_i^l = f(s_i^l)$):
+
+$$
+\frac{\partial J}{\partial w^l_{ij}}
+= \frac{\partial J}{\partial a^l_j} \frac{\partial a^l_j}{\partial w^l_{ij}}
+= \frac{\partial J}{\partial a^l_j} a^{l-1}_j
+= \delta^l_j a^{l-1}_j
+$$
+
+$$
+\delta^l_i = \begin{cases}
+f'(s_i^l) \, \sum_k{\left(\hat{y}^{(k)} - y^{(k)} \right)} &, l=L \\
+f'(s_i^l)
+  \, \sum_j{w^{l+1}_{ij} \delta^{l+1}_j} &, 0 \le l \le L-1
+\end{cases}
+$$
+
 The batch/matrix form backpropagation equations for a feed-forward NN end up being (for a layer $l$):
 
 $$
@@ -277,7 +294,20 @@ The back-propagation-through-time equations can be adapted to this kind of netwo
 
 This project has opted to use an established LSTM implementation (**Keras, TensorFlow backend, GPU accelerated**) instead of implementing from scratch a LSTM network based on the equations above. Nevertheless, *the settings have been chosen to have the coded model be faithful to a model represented by the equations above, avoiding the more complex/exotic variations.*
 
-Using Keras it was easy to try out various network architectures (different numbers of units, different numbers of hidden layers, activation function, and dropout layers) quickly, until we find a few that seemed promising.
+Using Keras it was quicker to try out various network architectures (different numbers of units, different numbers of hidden layers, activation function, and dropout layers) quickly, until we find a few that seemed promising.
+
+The chosen architecture was what was considered to be the simplest one that still has a good chance of possibly learning complex patterns from the data:
+
+![](./lstm_model.png?v=4)
+[Fig. - implemented LSTM model]
+
+The input shape for this network implemented in Keras is `(batch_size, num_timesteps, num_features)`, and it's important to not that one hypothetical "time instance" of the network only sees a `(batch_size, num_features)` chunk of input, and the network unrolled through time `num_timesteps` is the one to which input of shape `(batch_size, num_timesteps, num_features)` is actually being fed. This is slightly unintuitive for engineers/developers who have never implemented an RNN from scratch themselves and for whom it's not obvious that this is the optimal way to code a LSTM.
+
+When implementing this network with Keras, it's worth noting the input shape for such a network. A network specifying `input_shape`
+
+Two dropout layers were added to prevent over-fitting (dropout layers simply "turn off" neurons based on a configured probability).
+
+Learning is done in mini-batches (mini-batch gradient descent), using the RMSprop optimizer. The optimizer was selected because: (a) quick testing showed that it performs better than Keras's SGD, at least without much tuning of its parameters, (b) from literature and common knowledge it is known/expected that RMSprop performs well in most RNNs, and (c) is is known to work well without having to tune its parameters.
 
 ### Benchmark [1 page]
 
@@ -348,6 +378,170 @@ For the BTC-USD @ 5 min data the numbers look a bit more plausible, at least for
 | BTC-USD@5min (all) | n/a | 62.61% | 60.67% |
 | BTC-USD@5min (latest 3 months) | 52.70% | 52.16% | 51.85% |
 
-We can say that a target of >61% accuracy 100 time steps ahead (slightly above 8 hours) could be a minimal goal for the BUTC5min predictions.
+We can say that a target of >61% accuracy 100 time steps ahead (~8 hours) could be a minimal goal for the BTC@5min predictions.
+
+But, to wrap it up, the only thing we can state is that **a model with predictive accurracy *below* these thresholds is clearly useless**.
+
+> **TODO:** also explain that the main goal of these was to actually figure out how far ahead into the future to predict...
+
+## III. Methodology [3-5 pages]
+
+### Data processing [1 page]
+
+A very simple data processing pipeline was used for this project, consisting of the following stages:
+
+#### Stage 0 - fill forward missing data points
+The data has been chosen so that there are very few missing data points, but some remained, as mentioned in the "Data exploration" section. Simple fill-forward was employed, replacing missing each data point with a copy of the previous (past) data point.
+
+#### Stage 1 - reshaping data into sequences
+The models will be trained on overlapping sequences of given length, made by picking sliding windows from the data in increments of 1.
+
+The initial data of shape `num_samples` $\times$ `num_features` (`N` $\times$ `F`), looking like this:
+
+$$
+\begin{bmatrix}
+  x_{1,1} & x_{1,2} & \cdots & x_{1,F} \\
+  x_{2,1} & x_{2,2} & \cdots & x_{2,F} \\
+  \vdots & \vdots & \ddots & \vdots \\
+  x_{N,1} & x_{N,2} & \cdots & x_{N,F}
+\end{bmatrix}
+\in \mathbb{R}^{N \times F}
+$$
+
+...is transformed into sequences data shaped `N-K+1` $\times$ `K` $\times$ `F` (where `K` stands for `sequence_length`):
+
+$$
+\begin{bmatrix}
+&
+  \begin{bmatrix}
+    x_{1,1} & \cdots & x_{1,F} \\
+    x_{2,1} & \cdots & x_{2,F} \\
+    \vdots & \ddots & \vdots \\
+    x_{K,1} & \cdots & x_{K,F}
+  \end{bmatrix}
+  & ; &
+  \begin{bmatrix}
+    x_{2,1} & \cdots & x_{2,F} \\
+    x_{3,1} & \cdots & x_{3,F} \\
+    \vdots & \ddots & \vdots \\
+    x_{K+1,1} & \cdots & x_{K+1,F}
+  \end{bmatrix}
+  & ; & \cdots & ; &
+  \begin{bmatrix}
+    x_{N-K+1,1} & \cdots & x_{N-K+1,F} \\
+    x_{N-K+2,1} & \cdots & x_{N-K+2,F} \\
+    \vdots & \ddots & \vdots \\
+    x_{N,1} & \cdots & x_{K+1,F}
+  \end{bmatrix}
+\end{bmatrix} \in \mathbb{R}^{(N-K+1) \times K \times F}
+$$
+
+A very simple visualization of this process is:
+
+![](./f14.data_reshaping.png)
+[Fig. 4 - intuitive visualization of data reshaping to sequences as 3D matrix]
+
+#### Stage 2 - normalization
+To normalize data we simply divide each sequence by its first element $x_0$ and subtract 1 (values in range $0\cdots2x_0$ get mapped to $-1\cdots1$), so each value ends up representing percentage changes from the start of the window:
+
+$$n_i = \frac{x_i}{x_0} - 1$$
+
+The code also includes an option for min-max scaling to $-1\cdots1$ range ($n_i = 2 (x_i - x_{min}) / (x_{max} - x_{min}) - 1$) done on data before reshaping to sequences, with $min$ and $max$ from test data, but using this option didn't provide much benefit, some results were actually slightly worse, so we reverted to the basic normalization described above.
+
+De-normalization was in the end performed on the results to return to original price units.
+
+### Implementation [2 pages]
+The project was implemented in Python (2.7, 3.x compatible too), using NumPy and Pandas libraries for data processing, scikit-learn for data processing and simple LR models, StatsModels for the ARIMA model and related (P)ACF plots, and Keras (running with a TensorFlow backend) for building the LSTM RNN models.
+
+The code written for this project can be divided in:
+- **data loading and data cleanup code** - found mostly in `lib/etl.py` and the Jupyter notebooks and scripts from `data_cleanup/` (the sentiment analysis of news data is also here since it required very little code)
+- **model implementation code** - found under `models/`
+- **code for running experiments and testing models** - some in `lib/walk_forward_predict.py` and some in specific Jupyter notebooks
+- **support and visualization code** - in `lib/helpers.py` and `lib/visualization.py`
+
+The implementation of the LSTM models represents a very small percent of the total code, since Keras does much of the complex things underneath, while exposing s clean and simple API. For quicker iteration we defined a **model constructor maker** that takes a set of parameters:
+
+```python
+make_rnn_model_constructor(
+  layers : [LSTM_1_NUM_UNITS, DROPOUT_1_P, LSTM_2_NUM_UNITS, DROPOUT_2_P],
+  optimizer=RMSprop,
+  learning_rate,
+  loss=MSE,
+  output_activation=linear )
+->
+  rnn_model_maker
+```
+
+...and returns a **model maker**, which in turn will return a model based on its paramters too:
+
+```python
+rnn_model_maker(
+  sequence_length,
+  number_of_features )
+->
+  model made of layers:
+
+    LSTM(
+      units=LSTM_1_NUM_UNITS,
+      input_shape=(sequence_length, number_of_features),
+      return_sequences=True )
+
+    Dropout(DROPOUT_1_P)
+
+    LSTM(units=LSTM_2_NUM_UNITS)
+
+    Dropout(DROPOUT_2_P)
+    
+    Dense(1, activation=activation)
+```
+
+This may seem a bit convoluted but it provides lots of flexibility and enable rapid iteration. A nice diagram of such resulting model and discussion of the shape of its input can be found at "Analysis > Algorithms and Techniques" section).
+
+The most complicated part of the code ended up being the runner of walk-forward validation, mainly because (1) this code needed to tie everything else together, (2) it needed to be fast enough for rapid iteration (it's was very easy to end up with code so slow here that it ended up canceling even the benefits of using GPU acceleration for training), and (3) some bits of prediction code actually needed to be here in order to allow some optimizations.
+
+Due to the not so evident nature of some of the code, it is worth explaining here in pseudo-code how the incremental prediction with multiple features works:
+
+- starting from a time position `t` in the data (here we refer to original data, not sequences, even if actual code works with sequences)
+- we take a sequence of length `sequence_length` of data ending at `t`
+- for `i` = `0` to `predictions_length`
+  - feed our sequence into the model and obtain an `y`
+  - shift the sequence to the left by 1
+  - set this `y` as the `0/close` feature of the last element of the sequence
+  - predict the other features of the last element of the sequence using linear-regression on their past values inside the sequence
+- the last predicted `y` is the predicted value for time `preictions_length` * `data_interval` into the future
+
+For the number of units in the hidden LSTM layers, 3 and 3 were chosen for 24h data, and experiments were ran with increasing numbers starting from this. The heuristic used for choosing this was to have a number of units of the same order of magnitude as length of a sequence.
+
+Using a similar heuristic we picked 100 and 50 for the LSTM models used to predict 5 min data, since 100 is the picked sequence length at the 5 min resolution, with the aim of trying to both increase and decrease the size and see how end results vary.
+
+### Refinement [2 pages]
+> The process of improving upon the algorithms and techniques used is clearly documented. Both the initial and final solutions are reported, along with intermediate solutions, if necessary.
+
+> **TODO:** actually run more of these experiments and replace numbers with actual and reproducible ones
+
+> **TODO:** plot training/validation losses
+
+> **TODO:** maybe go for a "we changed optimizer from SGD to RMSProps" etc. here
 
 
+## IV. Results [2-3 pages]
+
+### Model Evaluation and Validation [1 page]
+> The final model’s qualities — such as parameters — are evaluated in detail. Some type of analysis is used to validate the robustness of the model’s solution.
+
+- !!! figure out how to verify robustness
+
+### Justification [1 page]
+> The final results are compared to the benchmark result or threshold with some type of statistical analysis. Justification is made as to whether the final model and solution is significant enough to have adequately solved the problem.
+
+
+## V. Conclusion [1-2 pages]
+
+### Free-Form Visualization [1 page]
+> A visualization has been provided that emphasizes an important quality about the project with thorough discussion. Visual cues are clearly defined.
+
+### Reflection [0.5 page]
+> Student adequately summarizes the end-to-end problem solution and discusses one or two particular aspects of the project they found interesting or difficult.
+
+### Improvement [0.5 page]
+> Discussion is made as to how one aspect of the implementation could be improved. Potential solutions resulting from these improvements are considered and compared/contrasted to the current solution.

@@ -19,6 +19,8 @@ def make_rnn_model_constructor(
         layers, optimizer=keras.optimizers.rmsprop, lr=None,
         loss='mse', activation='linear',
 ):
+    LSTM_1_NUM_UNITS, DROPOUT_1_P, LSTM_2_NUM_UNITS, DROPOUT_2_P = layers
+
     def print_model(m):
         print("\n--- Created model id: {}".format(id(m)))
         print(m.input)
@@ -29,15 +31,17 @@ def make_rnn_model_constructor(
     def make_model(seq_len, features_n):
         model = Sequential()
         model.add(LSTM(
-            units=layers[0],
+            units=LSTM_1_NUM_UNITS,
             input_shape=(seq_len, features_n),
             return_sequences=True,
         ))
-        model.add(Dropout(layers[1]))
+        if DROPOUT_1_P:
+            model.add(Dropout(DROPOUT_1_P))
         model.add(LSTM(
-            units=layers[2],
+            units=LSTM_2_NUM_UNITS,
         ))
-        model.add(Dropout(layers[3]))
+        if DROPOUT_2_P:
+            model.add(Dropout(DROPOUT_2_P))
         model.add(Dense(1, activation=activation))
 
         with helpers.timing('model compilation time'):

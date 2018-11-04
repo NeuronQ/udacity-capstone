@@ -48,12 +48,12 @@ def extract_data_matrix_from_df(
     return data
 
 
-def scaled_data(data):
+def scaled_data(data, train_sz):
     """Scale a [n_samples, n_features] numpy matrix of data to [-1, 1] range
     for each feature (column).
     """
     scaler = MinMaxScaler(feature_range=(-1, 1))
-    scaler.fit(data)
+    scaler.fit(data[:train_sz])
     sdata = scaler.transform(data)
     return sdata, scaler
 

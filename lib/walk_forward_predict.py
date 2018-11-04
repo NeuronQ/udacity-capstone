@@ -65,7 +65,7 @@ def run_walk_forward_validation_rnn(
     # normalize data
     scaler = None
     if normalize == 'data':
-        data, scaler = etl.scaled_data(data)
+        data, scaler = etl.scaled_data(data, train_sz)
     # detrend
     if detrend:
         data = etl.detrended_data(data)
@@ -140,6 +140,7 @@ def run_walk_forward_validation_rnn(
         test_on=test_sz,
         shuffle=shuffle,
         normalize=normalize,
+        train_val_losses=[],
     )
 
     # possibly multiple runs
@@ -159,10 +160,11 @@ def run_walk_forward_validation_rnn(
                 validation_split=0.05,
                 shuffle=False,
             )
+            out['train_val_losses'].append(training_history.history)
 
         final_training_loss = -1
         if training_history:
-            final_training_loss = training_history.history['loss'][-1]
+            final_training_loss = training_history.history['loss'][-1]  # val_loss
 
         with helpers.timing('walk and predict'):
             if not skip:
@@ -709,7 +711,7 @@ def run_walk_forward_validation_arima(
     # normalize data
     scaler = None
     if normalize == 'data':
-        data, scaler = etl.scaled_data(data)
+        data, scaler = etl.scaled_data(data, train_sz)
 
     # with helpers.timing('train'):
     #     model = ARIMA(train_data, order)
@@ -849,7 +851,7 @@ def run_walk_forward_validation_rnn_retraining(
     # normalize data
     scaler = None
     if normalize == 'data':
-        data, scaler = etl.scaled_data(data)
+        data, scaler = etl.scaled_data(data, train_sz)
     # detrend
     if detrend:
         data = etl.detrended_data(data)

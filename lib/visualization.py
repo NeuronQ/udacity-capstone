@@ -40,3 +40,14 @@ def simple_plot(
                  color='green', alpha=0.4, label='volume', linewidth=1)
     # legend
     ax2.legend(loc=1)
+
+
+def plot_train_val_losses(train_val_losses):
+    for i, losses in enumerate(train_val_losses):
+        plt.figure(facecolor='white')
+        plt.title("Training/validation loss" +
+                  (' #%d' % (i + 1)) if len(train_val_losses) else '')
+        plt.plot(losses['loss'], color='g', label='training')
+        plt.plot(losses['val_loss'], color='m', label='validation')
+        plt.legend()
+        plt.show()

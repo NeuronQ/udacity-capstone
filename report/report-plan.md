@@ -46,13 +46,18 @@ Student clearly defines a benchmark result or threshold for comparing performanc
 
 
 ## III. Methodology [3-5 pages]
-
+The process of improving upon the algorithms and techniques used is clearly documented. Both the initial and final solutions are reported, along with intermediate solutions, if necessary.
 ### Data processing [1 page]
+All preprocessing steps have been clearly documented. Abnormalities or characteristics about the data or input that needed to be addressed have been corrected. If no data preprocessing is necessary, it has been clearly justified.
 
 ### Implementation [2 pages]
+The process for which metrics, algorithms, and techniques were implemented with the given datasets or input data has been thoroughly documented. Complications that occurred during the coding process are discussed.
+
 - LSTS etc.
 
 ### Refinement [2 pages]
+The process of improving upon the algorithms and techniques used is clearly documented. Both the initial and final solutions are reported, along with intermediate solutions, if necessary.
+
 - !!! graph training vs validation accuracy
 
 
