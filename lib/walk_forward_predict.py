@@ -700,6 +700,7 @@ def run_walk_forward_validation_arima(
         test_sz,
         # data processing:
         normalize,
+        detrend,
         # model and prediction arrangement:
         order,
         pred_len,
@@ -732,6 +733,9 @@ def run_walk_forward_validation_arima(
     scaler = None
     if normalize == 'data':
         data, scaler = etl.scaled_data(data, train_sz)
+    # detrend
+    if detrend:
+        data = etl.detrended_data(data)
 
     # with helpers.timing('train'):
     #     model = ARIMA(train_data, order)
