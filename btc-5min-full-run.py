@@ -68,9 +68,13 @@ DEFAULT_PARAMS = {
     # model and prediction arrangement:
     'seq_len': 100,
     'pred_len': 100,
-    'model_maker': make_rnn_model_constructor([100, 0.1, 50, 0.1]),
+    'model_maker': make_rnn_model_constructor(
+        [100, 0.1, 50, 0.1],
+        lr=1e-4,
+        optimizer=keras.optimizers.RMSprop
+    ),
     # training:
-    'epochs': 3,
+    'epochs': 8,
     'batch_size': 512,
     'shuffle': False,
     # experiment setup:
