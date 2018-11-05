@@ -353,7 +353,7 @@ Integrating this with the fact that we also have a trend in our data, we can see
 
 If we run these models in a walk-forward incremental fashion: starting from a point in time $t$, predict the next point, then add the predicted point as the last one in a window of $k$ points ranging from $t-1$ to $t-k+1$ (a $t : t-k$ window shifted left with the predicted value added last), and repeat the process $n$ times as we move to predict at time $t+n$ in the end. This *is obviously irrelevant for the LR model since the results for a simple linear model would be the same even if point $k$ ahead was predicted directly, but it's worth mentioning with respect to ARIMA since the same strategy is used for LSTM models too.* We can plot these predictions easily, for example here we can see LR and ARIMA(2,1,1) predictions side by side on the same interval (figure note: LR model has different margins because for code-consistency reasons it runs on similar code with the LSTM model, while the ARIMA model was implemented separately due to its peculiarities; also RMSE for LR model is in normalized units while for ARIMA in price units, but we're only interested in comparing with constant prediction model here, and conversion is possible if we ever need).
 
-![](./f12.lr_and_arima_predictions_sample.png?v=2)
+![](./f12.lr_and_arima_predictions_sample.png?v=3)
 [Fig. 12 - sample incremental prediction for LR and ARIMA benchmark models]
 
 The results are *significantly worse than random change direction guessing for LR model DACC*. In the figure above the ARIMA model performs worse than random direction guessing (41.75%), but on average it's slightly better, oscillating at 55% ± 2%.
@@ -530,6 +530,8 @@ For predicting 24 h frequency data a LSTM model with the following configuration
   * **epochs:** 100
   * **learning rate:** 1e-4
 
+The model was had 820 trainable parameters (as reported by Keras' model description).
+
 For predicting 5 min frequency data a LSTM model with the following configuration was used:
 * **input shape:** `sequence_lengts = 7` $\times$ `num_features`, where `num_of_features` was:
   * **6** for open, high, low, close, volume, day of week
@@ -542,6 +544,8 @@ For predicting 5 min frequency data a LSTM model with the following configuratio
   * **batch size:** 512
   * **epochs:** 8
   * **learning rate:** 1e-4
+
+This model had 71,051 trainable parameters.
 
 We arrived at these architecture starting with some common structures mentioned in literature and web articles, and then carrying on with lots of experimentation on small chunks of data from out set, heuristically tuning them (mostly in exponential increments, eg, batch size 16, 32, 64, 128, learning rate 0.1, 0.01 etc.). From this, further model tuning was carried out in a more systematic way, as described in the following section.
 
@@ -582,6 +586,8 @@ The results for the BTCH @ 24 predictions with added features derived from S&P 5
 
 (Also practically identical to those above for the experiment with added news sentiment - mainly because the data was too sparse and most samples had no data for the sentiment feature so the network may have learned to ignore it.)
 
+The **ARIMA benchmark model** showed an directional accuracy of 53.38%, better than random guessing, but significantly lower than the LSTMS model. Interesting to note is the fact that the best performing of these benchmark models was an ARIMA(2,1,1). More complex models like ARIMA(7,1,1) and ARIMA(7,1,7), that were also supported by the intuition that they try to fit the ARIMA auto-regression params on the same number of times steps we are actually looking behind, produced more *intersting looking results* (eg. ARIMA graph in Fig. ?), but *performed worse.*
+
 For the stocks considered to be possibly BTC related, results were:
 
 | Stock | just OHLCV & weekday | + SP500 features |
@@ -597,9 +603,13 @@ For the stocks considered to be possibly BTC related, results were:
 
 Here we can see that for 7 (OSTK, RIOT, OTIV, NVDA, SIEB, GBTC, MARA) of the 8 stocks, adding extra features derived from the past price of bitcoin increases the predictive capabilities of the model.
 
-> **TODO:** add results from BTC @ 5 min model
+The model trained on BTC @ 5 min data proved not to be a very robust one. The overall training DACC on the walk-forward validation was 48.08%, lower even than random guessing. By comparison, ARIMA model performance this data was slightly better than random guessing (50-57% range).
 
-> **TODO:** add comparison with ARIMA models
+This is despite the fact that on particular stretches of data, like the ones we initially tested with, the model performed very well, achieving up to 74% DACC. This is how such a "deceiving run" can look like:
+
+![](./5min_74run.png)
+
+Such behavior can be very dangerous for a trading model, and shows why testing a model for robustness on large and multiple sets of data is essential.
 
 ### Justification [1 page]
 We can say that our actually have some predictive power, and in the hands of someone with actual trading experience they could be made to guide/power successful trading strategies.
@@ -624,6 +634,12 @@ But it is also frustrating for two reasons: (1) there is a chance that there is 
 It is also interesting how effective were the past recent Bitcoin price derived features for the prediction of stock prices of BTC-related companies. The features used were LR slope and R2 coefficient, with the intuition behind this being that we care both about the Bitcoin price tendency (slope), and about how likely it is that there actually is a tendency (R2). A clear tendency in the price of BTC that tends to vary seemingly randomly might be an indication of some external event (political, economical etc.) that could also affect the stock prices of the analyzed company. But more likely it's the model picking up on price variations induced by the behavior of other speculative traders, that themselves could try to adjust their bets based on past BTC prices when trading stock of a BTC related company.
 
 ### Improvement [0.5 page]
-> Discussion is made as to how one aspect of the implementation could be improved. Potential solutions resulting from these improvements are considered and compared/contrasted to the current solution.
+The is a lot of room for improvements at all levels of such a model: data pre-processing, training set selection (in literature there are references to complex setups like using unsupervised learning to select best slices of training data), prediction setup, and model refinement.
 
-The is a lot of room for improvements 
+Prediction setup would involve testing other predictions scenarios than incremental value prediction (regression), for example trying to predict change direction at an interval from present directly. There are lots of variables around this setup, so these further experiments could take considerable time.
+
+Model refinement and testing other RNN architectures is where the most interesting possible improvements could be made:
+* using a different type of RNN, like gated recurrent units (GRUs)
+* trying a convolutional neural network instead: despite the fact that these types of networks are known for their success in computer-vision problems, recent advances like DeepMind's WaveNet for audio waveforms have been applied by some to financial time series predictions too
+
+These kinds improvement of the core NN model used in this problem require specific skills in the field of deep-learning and more experience with the particular types of networks mentioned above, more than the very basic general machine-learning skill that were required to develop the project this far. But the topic of using neural-networks for financial time-series predictions looks full of promising new ideas to try.
