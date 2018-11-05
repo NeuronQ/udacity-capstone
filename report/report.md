@@ -626,3 +626,4 @@ It is also interesting how effective were the past recent Bitcoin price derived 
 ### Improvement [0.5 page]
 > Discussion is made as to how one aspect of the implementation could be improved. Potential solutions resulting from these improvements are considered and compared/contrasted to the current solution.
 
+The is a lot of room for improvements 

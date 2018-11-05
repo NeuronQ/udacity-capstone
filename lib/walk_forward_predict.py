@@ -662,6 +662,25 @@ def plot_pred_seqs_all(data, seq_len, pred_seqs):
         )
 
 
+"""
+Timeseries model base class
+
+Parameters
+----------
+endog
+exog
+dates
+freq : str {'B','D','W','M','A', 'Q'}
+    'B' - business day, ie., Mon. - Fri.
+    'D' - daily
+    'W' - weekly
+    'M' - monthly
+    'A' - annual
+    'Q' - quarterly
+
+"""
+
+
 def arima_predict(data, order, ahead):
     try:
         model = ARIMA(data, order)
