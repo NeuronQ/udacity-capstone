@@ -1,0 +1,4 @@
+model_description,train_from,train_to,test_on,shuffle,normalize,training_loss,rmse,rmse_cp,dir_acc
+"RNN(7|0.1|7|0.1|linear, RMSprop(lr=0.0001), mse) close,open,high,low,volume,weekday batch_size=32 epochs=100 seq_len=7 pred_len=7",0,300,300,False,seqs,3.2516e-03,0.0761%,0.1039%,72.7679%
+"RNN(7|0.1|7|0.1|linear, RMSprop(lr=0.0001), mse) close,open,high,low,volume,weekday batch_size=32 epochs=100 seq_len=7 pred_len=7",300,600,300,False,seqs,5.5362e-03,0.0729%,0.0951%,76.3393%
+"RNN(7|0.1|7|0.1|linear, RMSprop(lr=0.0001), mse) close,open,high,low,volume,weekday batch_size=32 epochs=100 seq_len=7 pred_len=7",600,900,300,False,seqs,8.7347e-03,0.1447%,0.1947%,75.8929%

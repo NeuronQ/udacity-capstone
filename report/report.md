@@ -125,6 +125,8 @@ Since we only care about the sign of profit being positive in this discussion, w
 
 It is important to note though that this kind of threshold model makes no assumption bout the amount that can be traded, the number of trades that can be made, the variability in time of the threshold itself (a trading strategy that needs a large number of trades to have a statistically significant chance of being profitable would also need a large period of *time* to make this trades and while time elapses the volatility of the asset can change), or of any limit of money that a trader can loosing before becoming "bankrupt" and having no more money to keep trading. Considering this and the source of this model, it is important to note that *it's probably only applicable to high frequency trading of very volatile assets, hence it's not necessarily expected to be of any use for data at time intervals larger than 5min.*
 
+A more practical use for this threshold could also be to guide us in selecting how many steps ahead to predict at.
+
 
 ## II. Analysis [2-4 pages]
 
@@ -309,6 +311,12 @@ Two dropout layers were added to prevent over-fitting (dropout layers simply "tu
 
 Learning is done in mini-batches (mini-batch gradient descent), using the RMSprop optimizer. The optimizer was selected because: (a) quick testing showed that it performs better than Keras's SGD, at least without much tuning of its parameters, (b) from literature and common knowledge it is known/expected that RMSprop performs well in most RNNs, and (c) is is known to work well without having to tune its parameters.
 
+During learning, last 10% of each batch were set aside for validation. This is primitive, and also no shuffling of training data was performed (on small batch experiments shuffling produced slightly worse results), but it reflex the common sense scenario of "train on past data, predict future data" that suits the situation.
+
+#### Derived features engineering
+
+For the purpose of predicting stock prices of possibly Bitcoin-involved panies based on the past price of Bitcoin, a simple linear-regression (LR) model was fitter on the price of bitcoin for the last $k$ (7, same as sequence length and prediction length) days. The LR **slope** and **R2 coefficient** were added as engineered features to the series being predicted.
+
 ### Benchmark [1 page]
 
 Besides comparing out results with data from literature (which tends to easily become an apples to oranges comparison even for such a straightforward prediction problem), three simple model benchmarks were chosen, and one "synthetic" or statistically derived "threshold of minimum accuracy for profitable strategies" benchmark was employed for comparing and evaluating our models.
@@ -350,8 +358,6 @@ If we run these models in a walk-forward incremental fashion: starting from a po
 
 The results are *significantly worse than random change direction guessing for LR model DACC*. In the figure above the ARIMA model performs worse than random direction guessing (41.75%), but on average it's slightly better, oscillating at 55% ± 2%.
 
-> **TODO:** add/update LR and ARIMA averages in the paragraph above and for all data series
-
 #### Attempting to derive a minimum profitable accuracy threshold
 
 Using the statistic heuristic formula for MinProfitableDACC defined at the end of the "Metrics" section, we can try and estimate these minimum threshold accuracies for our data. For daily data we look at these thresholds for 3 to 7 days ahead:
@@ -381,8 +387,6 @@ For the BTC-USD @ 5 min data the numbers look a bit more plausible, at least for
 We can say that a target of >61% accuracy 100 time steps ahead (~8 hours) could be a minimal goal for the BTC@5min predictions.
 
 But, to wrap it up, the only thing we can state is that **a model with predictive accurracy *below* these thresholds is clearly useless**.
-
-> **TODO:** also explain that the main goal of these was to actually figure out how far ahead into the future to predict...
 
 ## III. Methodology [3-5 pages]
 
@@ -433,6 +437,7 @@ $$
     \vdots & \ddots & \vdots \\
     x_{N,1} & \cdots & x_{K+1,F}
   \end{bmatrix}
+  &
 \end{bmatrix} \in \mathbb{R}^{(N-K+1) \times K \times F}
 $$
 
@@ -495,7 +500,7 @@ rnn_model_maker(
     Dense(1, activation=activation)
 ```
 
-This may seem a bit convoluted but it provides lots of flexibility and enable rapid iteration. A nice diagram of such resulting model and discussion of the shape of its input can be found at "Analysis > Algorithms and Techniques" section).
+This may seem a bit convoluted but it provides lots of flexibility and enable rapid iteration. A nice diagram of such resulting model and discussion of the shape of its input can be found above at "Analysis > Algorithms and Techniques" section).
 
 The most complicated part of the code ended up being the runner of walk-forward validation, mainly because (1) this code needed to tie everything else together, (2) it needed to be fast enough for rapid iteration (it's was very easy to end up with code so slow here that it ended up canceling even the benefits of using GPU acceleration for training), and (3) some bits of prediction code actually needed to be here in order to allow some optimizations.
 
@@ -510,8 +515,6 @@ Due to the not so evident nature of some of the code, it is worth explaining her
   - predict the other features of the last element of the sequence using linear-regression on their past values inside the sequence
 - the last predicted `y` is the predicted value for time `preictions_length` * `data_interval` into the future
 
-> **TODO:** figure out if below to also report results for just using close feature
-
 For predicting 24 h frequency data a LSTM model with the following configuration was used:
 * **input shape:** `sequence_lengts = 7` $\times$ `num_features`, where `num_of_features` was:
   * **6** for open, high, low, close, volume, day of week
@@ -525,20 +528,20 @@ For predicting 24 h frequency data a LSTM model with the following configuration
 * training params:
   * **batch size:** 32
   * **epochs:** 100
-  * **learning rate:** 0.0001
+  * **learning rate:** 1e-4
 
 For predicting 5 min frequency data a LSTM model with the following configuration was used:
 * **input shape:** `sequence_lengts = 7` $\times$ `num_features`, where `num_of_features` was:
   * **6** for open, high, low, close, volume, day of week
-* **LSTM hidden layer 1:** 100? units
+* **LSTM hidden layer 1:** 100 units
 * **dropout layer 1:** P = 0.1
-* **LSTM hidden layer 2:** 50? units
+* **LSTM hidden layer 2:** 50 units
 * **dropout layer 1:** P = 0.1
 * **1 unit dense layer with linear activation**
 * training params:
-  * **batch size:** ?
-  * **epochs:** ?
-  * **learning rate:** ?
+  * **batch size:** 512
+  * **epochs:** 8
+  * **learning rate:** 1e-4
 
 We arrived at these architecture starting with some common structures mentioned in literature and web articles, and then carrying on with lots of experimentation on small chunks of data from out set, heuristically tuning them (mostly in exponential increments, eg, batch size 16, 32, 64, 128, learning rate 0.1, 0.01 etc.). From this, further model tuning was carried out in a more systematic way, as described in the following section.
 
@@ -550,34 +553,76 @@ Most basic refinements were picking an optimal learning rate and trying to preve
 ![](./trainning_and_validation_loss.png?v=2)
 [Fig. - examples plots of training/validation loss during training on BTCH @ 24 h data]
 
-The graphs tuned up to be bit unintuitive, since on most of them there was no clear "point of divergence" after which validation loss would start increasing again while training loss keeps decreasing. Only a certain "chaos threshold" after which increasing the number of training epochs makes the losses vary in a seemingly chaotic fashion around a certain minimal value. Also, symptoms of overfitting (eg. "results get worse as we increase number of training epochs from this point onward") tended to appear before the points that seemed to suggest overfitting on the graph. Most of these *could be increased by the large amount of purely chaotic variation in the data* as they's what one could also see when trying to train a model on random-walk generated data.
+The graphs tuned up to be bit unintuitive, since on most of them there was no clear "point of divergence" after which validation loss would start increasing again while training loss keeps decreasing. Only a certain "chaos threshold" after which increasing the number of training epochs makes the losses vary in a seemingly chaotic fashion around a certain minimal value. Also, symptoms of overfitting (eg. "results get worse as we increase number of training epochs from this point onward") tended to appear before the points that seemed to suggest overfitting on the graph. Most of these *could be increased by the large amount of purely chaotic variation in the data* as they are what one could also see when trying to train a model on random-walk generated data.
 
 After trying to tune the optimzer's parameters a bit (optimizer we started with was `keras.optimizers.SGD`, which has optional parameters *momentum, decay* and *nesterov* boolean to use Nesterov momentum), what made the biggest improvement was actually switching to the RMSprop optimizer and using it with its default params as recommended and with a smaller learning rate, of 1e-4.
 
-> **TODO:** add comparion of results before and after adjustments
+As an example of the magnitude of improvement brought about by the model refinement, an increase from 72.32% to 75.00% was observed for the model predicting daily BTC 7 days ahead. Other improvements were more modest, around ~1.0-1.5%.
 
 ## IV. Results [2-3 pages]
-
-
 
 ### Model Evaluation and Validation [1 page]
 > The final model’s qualities — such as parameters — are evaluated in detail. Some type of analysis is used to validate the robustness of the model’s solution.
 
-- !!! figure out how to verify robustness
+To verify the robustness of the models, "walk forward validation" aka "walk and predict" was performed on the data:
+* model was trained on an slice $[x_{t-\text{train\_sz}+1} \cdots x_t]$ of data
+* on the following $[x_{t+k} \cdots x_{t+test\_sz}]$ slice predictions were made $n$ steps ahead (starting from $x_{t+k+1}$) using as model input the previous $k$ steps data, moving one step ahead after every prediction
 
+The alternative of retraining after every prediction was explored briefly but seemed to not produce better results, and for the 5 min frequency model running it would have also been extremely slow with current code.
 
+The results for the BTCH @ 24 predictions are:
+* using `close`, `open`, `high`, `low`, `volume`, `weekday`, training on 300 days and predicting on next 300 days interval ("walk-forward validation")
+  * DACC (change direction prediction accuracy) 7 days ahead: 75.00%
+  * RMSE: 25.35% better than CP (constant prediction) RMSE
+
+The results for the BTCH @ 24 predictions with added features derived from S&P 500 are:
+* using `close`, `open`, `high`, `low`, `volume`, `weekday`, `slope_sp500`, `r2_sp500`, training on 300 days and predicting on next 300 days interval
+  * DACC 7 days ahead: 72.32%
+  * RMSE: 22.64% better than CP
+
+(Also practically identical to those above for the experiment with added news sentiment - mainly because the data was too sparse and most samples had no data for the sentiment feature so the network may have learned to ignore it.)
+
+For the stocks considered to be possibly BTC related, results were:
+
+| Stock | just OHLCV & weekday | + SP500 features |
+|-|-|-|
+| OSTK | 68.53% | 73.21% |
+| RIOT | 69.87% | 71.88% |
+| AMD  | 67.41% | 66.96% |
+| OTIV | 72.77% | 75.89% |
+| NVDA | 75.89% | 75.89% |
+| SIEB | 63.84% | 61.61% |
+| GBTC | 72.77% | 73.21% |
+| MARA | 68.30% | 69.20% |
+
+Here we can see that for 7 (OSTK, RIOT, OTIV, NVDA, SIEB, GBTC, MARA) of the 8 stocks, adding extra features derived from the past price of bitcoin increases the predictive capabilities of the model.
+
+> **TODO:** add results from BTC @ 5 min model
+
+> **TODO:** add comparison with ARIMA models
 
 ### Justification [1 page]
-> The final results are compared to the benchmark result or threshold with some type of statistical analysis. Justification is made as to whether the final model and solution is significant enough to have adequately solved the problem.
+We can say that our actually have some predictive power, and in the hands of someone with actual trading experience they could be made to guide/power successful trading strategies.
 
+Comparing our predictions results for daily time series with the LR benchmark turns out not to be very useful, since all its results are worse than random guessing (<50%) on the same set of data. Also, all the results are above the "minimum treshold for possibly profitable accuracy" defined in the Benchmark section.
+
+For the results on the 5 min interval BTC-USD data, we can only say that they are better than random guessing. Whether they could power any kind of useful trading strategy is open for debate.
 
 ## V. Conclusion [1-2 pages]
-
 ### Free-Form Visualization [1 page]
-> A visualization has been provided that emphasizes an important quality about the project with thorough discussion. Visual cues are clearly defined.
+It is useful to visualize the results produced by a machine learning model even when working on such a non-visual problem as financial data prediction. The following is a more clear and colorful visualization of predictions made by our LST model on BTC daily data (we can see clourful strands of incremental predictions starting from a point, and the blue line of true price data):
+
+![](./vis_pred.png)
+
+The problem with such visualizations thought is that models whose results look interesting and seem to have managed to model interesting properties of the data, are usually very poor performing. "Boring looking" predictions like the ones above are usually the accurate ones.
 
 ### Reflection [0.5 page]
-> Student adequately summarizes the end-to-end problem solution and discusses one or two particular aspects of the project they found interesting or difficult.
+The problem of financial time-series predictions in interesting, because one is applying machine learning techniques to a problem where there is no clear patterns that humans themselves can see and that we'd expect the model to pick up. On other machine learning problems, the algorithm is trying to automate some task that humans can do too, and that humans understand, but here we are trying to develop algorithms that humans can't see by themselves.
+
+But it is also frustrating for two reasons: (1) there is a chance that there is not actually much information in the data to guide predictions (the "Efficient Market Hypothesis" assumes that any information existent has already been acted on by other players), so despite the effort, achieving a good enough result might not be possible for a certain set of data (of course, we can always look for more sources of related data), and (2) there is very littler intuition about what the model does, and how to adjust it, at least for people developing such models without being professional traders themselves - as opposed to, for example, a computer vision problem, where the intuitive aspects can be obvious to anyone indifferent of background.
+
+It is also interesting how effective were the past recent Bitcoin price derived features for the prediction of stock prices of BTC-related companies. The features used were LR slope and R2 coefficient, with the intuition behind this being that we care both about the Bitcoin price tendency (slope), and about how likely it is that there actually is a tendency (R2). A clear tendency in the price of BTC that tends to vary seemingly randomly might be an indication of some external event (political, economical etc.) that could also affect the stock prices of the analyzed company. But more likely it's the model picking up on price variations induced by the behavior of other speculative traders, that themselves could try to adjust their bets based on past BTC prices when trading stock of a BTC related company.
 
 ### Improvement [0.5 page]
 > Discussion is made as to how one aspect of the implementation could be improved. Potential solutions resulting from these improvements are considered and compared/contrasted to the current solution.
+

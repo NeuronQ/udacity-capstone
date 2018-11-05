@@ -160,7 +160,8 @@ def run_walk_forward_validation_rnn(
                 validation_split=0.1,
                 shuffle=False,
             )
-            out['train_val_losses'].append(training_history.history)
+            if hasattr(training_history, 'training_history'):
+                out['train_val_losses'].append(training_history.history)
 
         final_training_loss = -1
         if training_history:
@@ -907,6 +908,7 @@ def run_walk_forward_validation_rnn_retraining(
         test_on=test_sz,
         shuffle=shuffle,
         normalize=normalize,
+        train_val_losses=[],
     )
 
     # possibly multiple runs
@@ -960,6 +962,7 @@ def run_walk_forward_validation_rnn_retraining(
                 validation_split=0.05,
                 shuffle=False,
             )
+            out['train_val_losses'].append(training_history.history)
 
             final_training_loss = -1
             if training_history:

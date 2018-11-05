@@ -43,7 +43,7 @@ pp = pprint.PrettyPrinter(indent=2).pprint
 
 # PARAMS:
 BC5M_FILENAME = './data_clean/btc.300s.cbpro.csv'
-OUT_FILENAME = './results/btc5min_ohlc.csv'
+OUT_FILENAME = './full_results/btc5min_ohlc.csv'
 
 
 data5m = pd.read_csv(
@@ -121,6 +121,7 @@ def full_run(idx_from, idx_to, write_csv_header=False):
                 i, params['from_i'], params['train_sz'], params['test_sz']))
             with timing('run segment'):
                 out = run_walk_forward_validation_rnn(**params)
+                del out['train_val_losses']
                 csv_writer.writerow(out)
                 out_file.flush()
 
