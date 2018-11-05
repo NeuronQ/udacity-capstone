@@ -700,7 +700,6 @@ def run_walk_forward_validation_arima(
         test_sz,
         # data processing:
         normalize,
-        detrend,
         # model and prediction arrangement:
         order,
         pred_len,
@@ -722,7 +721,6 @@ def run_walk_forward_validation_arima(
         from_i,
         from_i + train_sz + test_sz
     )
-    data.setflags(write=False)
     train_data = data[:train_sz]
     train_data.setflags(write=False)
     test_data = data[train_sz:]
@@ -733,9 +731,9 @@ def run_walk_forward_validation_arima(
     scaler = None
     if normalize == 'data':
         data, scaler = etl.scaled_data(data, train_sz)
-    # detrend
-    if detrend:
-        data = etl.detrended_data(data)
+
+    data.setflags(write=False)
+
 
     # with helpers.timing('train'):
     #     model = ARIMA(train_data, order)
@@ -749,7 +747,6 @@ def run_walk_forward_validation_arima(
     for i in range(0, len(test_data) - pred_len, step):
         # ys = res.forecast(i + pred_len)[0][i:]
         ys = arima_predict(data[: train_sz + i], order, pred_len)
-        pred_seqs.append(ys.copy())
 
         loss = compute_dacc_loss_vs_ct_y(
             ys[-1],
@@ -768,6 +765,8 @@ def run_walk_forward_validation_arima(
             print("WARNING: can't compute loss for prediction at index %d" % (
                 train_sz + i + pred_len,
             ))
+        
+        pred_seqs.append(ys.copy())
 
     losses[0] /= losses_count
     losses[1] /= losses_count
