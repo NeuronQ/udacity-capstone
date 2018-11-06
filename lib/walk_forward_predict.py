@@ -44,6 +44,42 @@ def run_walk_forward_validation_rnn(
     fig_size=(10, 8),
     fast=False
 ):
+    """
+
+    Parameters
+    ----------
+    data_df : data as pandas DataFrame
+    features : list of features (columns from data_df), eg. ['close', 'volume']
+    from_i : numeric index from where to start training
+    train_sz : how many data points to train on
+    test_sz : how many datapoints to test on
+    normalize : whether to normlaize sequences('sequences'), whole data
+        before making sequences ('data') or nothing (None)
+    detrend : bool
+    seq_len : length of model input sequence
+    pred_len : how many steps ahead to predict
+    model_maker : model maker constructor (see models/...)
+    epochs : int
+    batch_size : int
+    shuffle : bool
+    times : int
+        can 1 or 4, if you want to run same thing 4 times
+    skip : bool
+        if true, only predict every pred_len steps (much faster)
+    fix_all_rngs_to : int
+    fix_rngs_before_each : bool
+    plot : bool
+        if true generate plots too
+    model_desc : str
+        extra string added to model description
+    fig_size: tuple
+    fast : bool
+        select the implementation (set True unless debugging something)
+
+    Returns
+    -------
+    dict of statistics about training and prediction results
+    """
     assert normalize in {'seqs', 'data'}
     assert times in {1, 4}, "plotting support for other values not implemented"
 
@@ -114,7 +150,7 @@ def run_walk_forward_validation_rnn(
     if plot:
         plt.figure(figsize=fig_size, facecolor='white')
         desc = (
-            'train on {from_idx}:{to_idx} bc@5m data shuffle={shuffle}, '
+            'train on {from_idx}:{to_idx} data shuffle={shuffle}, '
             'test on next {test_sz}, normalize={normalize}'
         ).format(
             from_idx=from_i,
@@ -734,7 +770,6 @@ def run_walk_forward_validation_arima(
 
     data.setflags(write=False)
 
-
     # with helpers.timing('train'):
     #     model = ARIMA(train_data, order)
     #     res = model.fit()
@@ -765,7 +800,7 @@ def run_walk_forward_validation_arima(
             print("WARNING: can't compute loss for prediction at index %d" % (
                 train_sz + i + pred_len,
             ))
-        
+
         pred_seqs.append(ys.copy())
 
     losses[0] /= losses_count
