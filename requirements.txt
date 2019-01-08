@@ -86,7 +86,7 @@ pydocstyle==3.0.0
 pyflakes==1.6.0
 Pygments==2.2.0
 pyparsing==2.2.0
-PySide==1.2.1
+# PySide==1.2.1
 python-dateutil==2.7.3
 python-jsonrpc-server==0.0.2
 python-language-server==0.21.2
